@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env*.local
+!.env.example
+
+# Build & Cache directories
+.next/
+.strapi/
+build/
+dist/
+out/
+coverage/
+
+# Logs & System files
+*.log
+.DS_Store
+.vscode/
