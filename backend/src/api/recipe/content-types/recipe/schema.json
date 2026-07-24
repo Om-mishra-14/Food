@@ -71,18 +71,6 @@
       "required": true,
       "default": false
     },
-    "recipes": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::recipe.recipe",
-      "mappedBy": "author"
-    },
-    "author": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::recipe.recipe",
-      "inversedBy": "recipes"
-    },
     "prepTime": {
       "type": "integer"
     },
@@ -106,6 +94,12 @@
       "relation": "oneToMany",
       "target": "api::saved-recipe.saved-recipe",
       "mappedBy": "recipe"
+    },
+    "users_permissions_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "author"
     }
   }
 }

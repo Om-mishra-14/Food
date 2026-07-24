@@ -523,7 +523,6 @@ export interface ApiRecipeRecipe extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    author: Schema.Attribute.Relation<'manyToOne', 'api::recipe.recipe'>;
     category: Schema.Attribute.Enumeration<
       ['breakfast', 'lunch', 'dinner', 'snack', 'dessert']
     >;
@@ -573,7 +572,6 @@ export interface ApiRecipeRecipe extends Struct.CollectionTypeSchema {
     nutrition: Schema.Attribute.JSON;
     prepTime: Schema.Attribute.Integer;
     publishedAt: Schema.Attribute.DateTime;
-    recipes: Schema.Attribute.Relation<'oneToMany', 'api::recipe.recipe'>;
     saved_recipes: Schema.Attribute.Relation<
       'oneToMany',
       'api::saved-recipe.saved-recipe'
@@ -585,6 +583,10 @@ export interface ApiRecipeRecipe extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    users_permissions_user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -1079,6 +1081,7 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    author: Schema.Attribute.Relation<'oneToMany', 'api::recipe.recipe'>;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     clerkid: Schema.Attribute.String &
       Schema.Attribute.Required &
