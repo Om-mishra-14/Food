@@ -51,7 +51,7 @@ module.exports = {
       };
     } catch (error) {
       strapi.log.error('Razorpay create-order error:', error);
-      ctx.internalServerError('Failed to create payment order');
+      ctx.internalServerError(error.message || 'Failed to create payment order');
     }
   },
 
@@ -118,7 +118,7 @@ module.exports = {
       };
     } catch (error) {
       strapi.log.error('Razorpay verify-payment error:', error);
-      ctx.internalServerError('Payment verification failed');
+      ctx.internalServerError(error.message || 'Payment verification failed');
     }
   },
 };
