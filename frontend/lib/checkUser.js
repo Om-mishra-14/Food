@@ -1,7 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 
 const STRAPI_URL = 
-    process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
+    process.env.NEXT_PUBLIC_STRAPI_URL || "https://food-backend-e25g.onrender.com";
 const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN;
 
 export const checkUser = async() => {

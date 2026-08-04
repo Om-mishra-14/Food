@@ -411,7 +411,7 @@ export default function PricingSection({ subscriptionTier = "free" }) {
 
       // 1. Create order on Strapi backend
       const strapiUrl =
-        process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
+        process.env.NEXT_PUBLIC_STRAPI_URL || "https://food-backend-e25g.onrender.com";
 
       const orderRes = await fetch(`${strapiUrl}/api/payment/create-order`, {
         method: "POST",
