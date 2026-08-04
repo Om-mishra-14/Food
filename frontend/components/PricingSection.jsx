@@ -424,8 +424,19 @@ export default function PricingSection({ subscriptionTier = "free" }) {
       });
 
       if (!orderRes.ok) {
-        const err = await orderRes.text();
-        throw new Error(err || "Failed to create order");
+        const errText = await orderRes.text();
+        let errMsg = "Failed to create payment order";
+        try {
+          const errJson = JSON.parse(errText);
+          errMsg = errJson.error?.message || errJson.message || errMsg;
+        } catch {
+          if (errText.includes("<!DOCTYPE") || errText.includes("<html")) {
+            errMsg = "Backend server is waking up or unavailable. Please try again in 10 seconds.";
+          } else {
+            errMsg = errText;
+          }
+        }
+        throw new Error(errMsg);
       }
 
       const { orderId, amount: orderAmount, currency, keyId } = await orderRes.json();
@@ -457,7 +468,13 @@ export default function PricingSection({ subscriptionTier = "free" }) {
               }),
             });
 
-            const verifyData = await verifyRes.json();
+            const verifyText = await verifyRes.text();
+            let verifyData = {};
+            try {
+              verifyData = JSON.parse(verifyText);
+            } catch {
+              throw new Error("Invalid verification response from server");
+            }
 
             if (verifyRes.ok && verifyData.success) {
               toast.success("🎉 Welcome to Pro! Refreshing your account…");
@@ -465,7 +482,7 @@ export default function PricingSection({ subscriptionTier = "free" }) {
                 window.location.reload();
               }, 1500);
             } else {
-              toast.error("Payment verified but upgrade failed. Contact support.");
+              toast.error(verifyData.error?.message || verifyData.message || "Payment verified but upgrade failed. Contact support.");
             }
           } catch (err) {
             toast.error("Verification failed: " + err.message);
