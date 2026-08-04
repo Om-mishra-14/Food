@@ -1,0 +1,38 @@
+name: Keep Supabase Alive
+
+# Runs every 5 days to prevent Supabase free-tier from pausing the project.
+# Supabase free projects pause after 7 days of no database activity.
+# This workflow pings the Strapi health endpoint, which triggers a DB query
+# and resets the 7-day inactivity timer.
+#
+# Decision recorded here: Option B (free keep-alive) — accepted 2026-08.
+# Remove this workflow if the project is upgraded to Supabase Pro.
+
+on:
+  schedule:
+    # Every 5 days at 08:00 UTC (well within the 7-day window)
+    - cron: '0 8 */5 * *'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  ping:
+    name: Ping Strapi to keep Supabase active
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Strapi health endpoint
+        run: |
+          echo "Pinging Strapi to keep Supabase project active..."
+          # Strapi's built-in health check endpoint — no auth required
+          STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+            --max-time 30 \
+            "${{ secrets.STRAPI_URL }}/_health")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "✅ Ping successful — Supabase project remains active."
+          else
+            echo "⚠️  Ping returned status $STATUS — check if Render is sleeping."
+            # Not failing the workflow — Render cold-start may need a second ping.
+            exit 0
+          fi

@@ -18,3 +18,7 @@ coverage/
 *.log
 .DS_Store
 .vscode/
+
+# Strapi data export — may contain user data; never commit
+strapi-backup*
+*.tar.gz
