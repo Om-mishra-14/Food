@@ -34,7 +34,7 @@ module.exports = {
       const options = {
         amount: amount * 100, // Razorpay expects paise (multiply by 100)
         currency,
-        receipt: `receipt_${userId}_${Date.now()}`,
+        receipt: `rcpt_${Date.now()}`,
         notes: {
           userId,
           billingCycle: billingCycle || 'monthly',
