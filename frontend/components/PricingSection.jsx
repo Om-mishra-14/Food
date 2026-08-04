@@ -411,7 +411,9 @@ export default function PricingSection({ subscriptionTier = "free" }) {
       const amount = billingCycle === "yearly" ? 199 * 12 * 0.8 : 199; // total amount
 
       // 1. Create order on Strapi backend
-      const strapiUrl = getStrapiUrl();
+      // Always use production backend for payments - env vars may not be available on Vercel
+      const strapiUrl = "https://food-backend-e25g.onrender.com";
+      console.log("[Payment] Using Strapi URL:", strapiUrl);
 
       const orderRes = await fetch(`${strapiUrl}/api/payment/create-order`, {
         method: "POST",
