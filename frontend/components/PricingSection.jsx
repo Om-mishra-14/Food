@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Check, X, ChevronDown, Sparkles, Zap, Star, ArrowRight } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { getStrapiUrl } from "@/lib/utils";
 
 // ─── Pricing config ────────────────────────────────────────────────────────────
 const PLANS = {
@@ -410,8 +411,7 @@ export default function PricingSection({ subscriptionTier = "free" }) {
       const amount = billingCycle === "yearly" ? 199 * 12 * 0.8 : 199; // total amount
 
       // 1. Create order on Strapi backend
-      const strapiUrl =
-        process.env.NEXT_PUBLIC_STRAPI_URL || "https://food-backend-e25g.onrender.com";
+      const strapiUrl = getStrapiUrl();
 
       const orderRes = await fetch(`${strapiUrl}/api/payment/create-order`, {
         method: "POST",
