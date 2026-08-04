@@ -377,16 +377,21 @@ export default function PricingSection({ subscriptionTier = "free" }) {
   const [loading, setLoading] = useState(false);
   const { user } = useUser();
 
-  // Load Razorpay checkout script
-  useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
+  // Load Razorpay checkout script dynamically
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (typeof window !== "undefined" && window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
 
   const handleUpgrade = async (billingCycle) => {
     if (!user) {
@@ -397,6 +402,11 @@ export default function PricingSection({ subscriptionTier = "free" }) {
     setLoading(true);
 
     try {
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        throw new Error("Failed to load Razorpay SDK. Please check your internet connection.");
+      }
+
       const amount = billingCycle === "yearly" ? 199 * 12 * 0.8 : 199; // total amount
 
       // 1. Create order on Strapi backend
@@ -434,29 +444,34 @@ export default function PricingSection({ subscriptionTier = "free" }) {
         },
         theme: { color: "#f97316" },
         handler: async (response) => {
-          // 3. Verify payment on Strapi backend
-          const verifyRes = await fetch(`${strapiUrl}/api/payment/verify`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              clerkId: user.id,
-            }),
-          });
+          try {
+            // 3. Verify payment on Strapi backend
+            const verifyRes = await fetch(`${strapiUrl}/api/payment/verify`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                clerkId: user.id,
+              }),
+            });
 
-          const verifyData = await verifyRes.json();
+            const verifyData = await verifyRes.json();
 
-          if (verifyRes.ok && verifyData.success) {
-            toast.success("🎉 Welcome to Pro! Refreshing your account…");
-            setTimeout(() => {
-              window.location.reload();
-            }, 1500);
-          } else {
-            toast.error("Payment verified but upgrade failed. Contact support.");
+            if (verifyRes.ok && verifyData.success) {
+              toast.success("🎉 Welcome to Pro! Refreshing your account…");
+              setTimeout(() => {
+                window.location.reload();
+              }, 1500);
+            } else {
+              toast.error("Payment verified but upgrade failed. Contact support.");
+            }
+          } catch (err) {
+            toast.error("Verification failed: " + err.message);
+          } finally {
+            setLoading(false);
           }
-          setLoading(false);
         },
         modal: {
           ondismiss: () => {
@@ -468,7 +483,7 @@ export default function PricingSection({ subscriptionTier = "free" }) {
 
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", (response) => {
-        toast.error(`Payment failed: ${response.error.description}`);
+        toast.error(`Payment failed: ${response.error?.description || "Transaction failed"}`);
         setLoading(false);
       });
       rzp.open();

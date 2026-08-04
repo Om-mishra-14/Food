@@ -10,13 +10,11 @@ import React, { useState } from "react";
 const PricingModal = ({ subscriptionTier = "free", children }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const canOpen = subscriptionTier === "free";
-
   return (
     <>
       <span
-        onClick={() => canOpen && setIsOpen(true)}
-        style={{ cursor: canOpen ? "pointer" : "default" }}
+        onClick={() => setIsOpen(true)}
+        className="cursor-pointer"
       >
         {children}
       </span>
