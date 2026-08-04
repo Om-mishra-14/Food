@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Check, X, ChevronDown, Sparkles, Zap, Star, ArrowRight } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { getStrapiUrl } from "@/lib/utils";
 
 // ─── Pricing config ────────────────────────────────────────────────────────────
@@ -377,6 +378,7 @@ export default function PricingSection({ subscriptionTier = "free" }) {
   const [billing, setBilling] = useState("monthly");
   const [loading, setLoading] = useState(false);
   const { user } = useUser();
+  const router = useRouter();
 
   // Load Razorpay checkout script dynamically
   const loadRazorpayScript = () => {
@@ -489,7 +491,7 @@ export default function PricingSection({ subscriptionTier = "free" }) {
             if (verifyRes.ok && verifyData.success) {
               toast.success("🎉 Welcome to Pro! Refreshing your account…");
               setTimeout(() => {
-                window.location.reload();
+                router.refresh(); // Forces Next.js to bypass Vercel cache and re-fetch Server Components
               }, 1500);
             } else {
               console.error("[Payment] Verify failed:", verifyData);
