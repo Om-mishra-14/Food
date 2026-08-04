@@ -10,6 +10,8 @@ import { checkUser } from "@/lib/checkUser";
 
 
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   const user = await checkUser();
   const subscriptionTier = user?.subscriptionTier || "free";
