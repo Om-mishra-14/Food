@@ -46,7 +46,7 @@ export default function HowToCookModal() {
         How to Cook?
       </DialogTrigger>
 
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-[95vw] max-w-lg rounded-2xl p-6 bg-white shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-serif font-bold flex items-center gap-2">
             <ChefHat className="w-6 h-6 text-orange-600" />

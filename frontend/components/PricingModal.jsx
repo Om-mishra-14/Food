@@ -21,7 +21,7 @@ const PricingModal = ({ subscriptionTier = "free", children }) => {
         {children}
       </span>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="p-6 sm:max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 bg-white shadow-2xl">
           <DialogTitle className="sr-only">Upgrade to Pro</DialogTitle>
           <PricingSection subscriptionTier={subscriptionTier} />
         </DialogContent>

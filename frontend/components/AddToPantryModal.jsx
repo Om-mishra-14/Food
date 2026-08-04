@@ -132,23 +132,29 @@ export default function AddToPantryModal({ isOpen, onClose, onSuccess }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-none">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-6 bg-white shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold tracking-tight">
+          <DialogTitle className="text-2xl font-bold tracking-tight text-stone-900">
             Add to Pantry
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-stone-500">
             Scan your pantry with AI or add items manually
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="scan" className="gap-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4 flex flex-col gap-4">
+          <TabsList className="grid w-full grid-cols-2 h-12 p-1 bg-stone-100 rounded-xl">
+            <TabsTrigger
+              value="scan"
+              className="gap-2 h-full font-semibold text-stone-600 data-[state=active]:bg-white data-[state=active]:text-stone-900 data-[state=active]:shadow-sm rounded-lg"
+            >
               <Camera className="w-4 h-4" />
               AI Scan
             </TabsTrigger>
-            <TabsTrigger value="manual" className="gap-2">
+            <TabsTrigger
+              value="manual"
+              className="gap-2 h-full font-semibold text-stone-600 data-[state=active]:bg-white data-[state=active]:text-stone-900 data-[state=active]:shadow-sm rounded-lg"
+            >
               <Plus className="w-4 h-4" />
               Add Manually
             </TabsTrigger>

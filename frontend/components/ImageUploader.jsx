@@ -6,6 +6,7 @@ import { Camera, Upload, X, Loader2, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { RingLoader } from "react-spinners";
+import { toast } from "sonner";
 
 export default function ImageUploader({ onImageSelect, loading }) {
   const [preview, setPreview] = useState(null);
@@ -15,6 +16,18 @@ export default function ImageUploader({ onImageSelect, loading }) {
     (acceptedFiles) => {
       const file = acceptedFiles[0];
       if (!file) return;
+
+      // Validate image type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select or drop a valid image file (PNG, JPG, WebP, etc.)");
+        return;
+      }
+
+      // Validate max size (10MB)
+      if (file.size > 10485760) {
+        toast.error("Image file size must be less than 10MB");
+        return;
+      }
 
       // Create preview
       const reader = new FileReader();
@@ -31,13 +44,7 @@ export default function ImageUploader({ onImageSelect, loading }) {
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: {
-      "image/*": [".jpeg", ".jpg", ".png", ".webp"],
-    },
-    maxFiles: 1,
-    maxSize: 10485760, // 10MB
-    noClick: true,
-    noKeyboard: true,
+    multiple: false,
   });
 
   const handleFileInputChange = (e) => {
@@ -87,15 +94,15 @@ export default function ImageUploader({ onImageSelect, loading }) {
     <>
       <div
         {...getRootProps()}
-        className={`relative w-full aspect-square border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
+        className={`relative w-full py-10 px-6 border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
           isDragActive
-            ? "border-orange-600 bg-orange-50 scale-[1.02]"
+            ? "border-orange-600 bg-orange-50 scale-[1.01]"
             : "border-stone-300 bg-stone-50 hover:border-orange-400 hover:bg-orange-50/50"
         }`}
       >
-        <input {...getInputProps()} />
+        <input {...getInputProps({ accept: "image/*" })} />
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
           {/* Icon */}
           <div
             className={`p-4 rounded-full transition-all ${
