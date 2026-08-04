@@ -1,18 +1,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { auth } from "@clerk/nextjs/server";
 import { ArrowRight, Clock, Flame, Star, User, } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 import { FEATURES, HOW_IT_WORKS_STEPS, SITE_STATS } from "@/lib/data";
 import PricingSection from "@/components/PricingSection";
+import { checkUser } from "@/lib/checkUser";
 
 
 
 export default async function Home() {
-  const { has } = await auth();
-  const subscriptionTier = has({ plan: "pro" }) ? "pro" : "free";
+  const user = await checkUser();
+  const subscriptionTier = user?.subscriptionTier || "free";
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <section className="pt-32 pb-20 px-4">
