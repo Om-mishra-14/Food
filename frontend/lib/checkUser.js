@@ -38,9 +38,12 @@ export const checkUser = async() => {
         const existingUserData = await existingUserResponse.json();
 
         if (existingUserData.length > 0){
+            // Because of a race condition on sign up, there might be multiple duplicate users in Strapi
+            // We need to check if ANY of them are "pro"
+            const isPro = existingUserData.some(u => u.subscriptionTier === "pro");
             const existingUser = existingUserData[0];
-            // Read subscriptionTier directly from Strapi — Razorpay webhook sets this to "pro"
-            const subscriptionTier = existingUser.subscriptionTier || "free";
+            const subscriptionTier = isPro ? "pro" : (existingUser.subscriptionTier || "free");
+            
             return { ...existingUser, subscriptionTier };
         }
 
