@@ -3,10 +3,20 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Lazy-initialize Razorpay so missing keys don't crash Strapi on startup.
+// The instance is created on first use, not at module load time.
+let _razorpay = null;
+function getRazorpay() {
+  if (!_razorpay) {
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!key_id || key_id === 'rzp_test_REPLACE_ME' || !key_secret || key_secret === 'REPLACE_ME_WITH_YOUR_SECRET') {
+      throw new Error('Razorpay keys are not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.');
+    }
+    _razorpay = new Razorpay({ key_id, key_secret });
+  }
+  return _razorpay;
+}
 
 module.exports = {
   /**
@@ -31,7 +41,7 @@ module.exports = {
         },
       };
 
-      const order = await razorpay.orders.create(options);
+      const order = await getRazorpay().orders.create(options);
 
       ctx.body = {
         orderId: order.id,
