@@ -458,6 +458,11 @@ export default function PricingSection({ subscriptionTier = "free" }) {
         theme: { color: "#f97316" },
         handler: async (response) => {
           try {
+            console.log("[Payment] Razorpay success callback fired");
+            console.log("[Payment] Response:", JSON.stringify(response));
+            console.log("[Payment] Sending verify to:", `${strapiUrl}/api/payment/verify`);
+            console.log("[Payment] clerkId:", user.id);
+
             // 3. Verify payment on Strapi backend
             const verifyRes = await fetch(`${strapiUrl}/api/payment/verify`, {
               method: "POST",
@@ -470,7 +475,10 @@ export default function PricingSection({ subscriptionTier = "free" }) {
               }),
             });
 
+            console.log("[Payment] Verify response status:", verifyRes.status);
             const verifyText = await verifyRes.text();
+            console.log("[Payment] Verify response body:", verifyText);
+            
             let verifyData = {};
             try {
               verifyData = JSON.parse(verifyText);
@@ -484,9 +492,11 @@ export default function PricingSection({ subscriptionTier = "free" }) {
                 window.location.reload();
               }, 1500);
             } else {
+              console.error("[Payment] Verify failed:", verifyData);
               toast.error(verifyData.error?.message || verifyData.message || "Payment verified but upgrade failed. Contact support.");
             }
           } catch (err) {
+            console.error("[Payment] Handler error:", err);
             toast.error("Verification failed: " + err.message);
           } finally {
             setLoading(false);
