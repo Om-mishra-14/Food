@@ -37,10 +37,10 @@ const Check = ({ c = "#121212", s = 16 }) => <IconCheck size={s} stroke={c} sw={
 export default function HomeScreen() {
   const ref = useRef(null);
   const router = useRouter();
-  const { isPro, setIsPro } = useKitchen();
+  const { isPro, afterUpgrade } = useKitchen();
   const [billing, setBilling] = useState("monthly");
   const [faq, setFaq] = useState(null);
-  const { upgrade, loading } = useProUpgrade({ onUpgraded: () => setIsPro(true) });
+  const { upgrade, loading } = useProUpgrade({ onUpgraded: afterUpgrade });
   const priceRef = useRef(null), faqRef = useRef(null);
   const firstBill = useRef(true);
 

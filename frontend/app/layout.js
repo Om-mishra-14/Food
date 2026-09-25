@@ -3,7 +3,6 @@ import "./globals.css";
 import "./servd.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
-import { checkUser } from "@/lib/checkUser";
 import KitchenProvider from "@/components/servd/KitchenProvider";
 import AppShell from "@/components/servd/AppShell";
 
@@ -21,11 +20,7 @@ export const viewport = {
   themeColor: "#1E1D1F",
 };
 
-export const dynamic = "force-dynamic";
-
-export default async function RootLayout({ children }) {
-  const user = await checkUser();
-
+export default function RootLayout({ children }) {
   return (
     <ClerkProvider
       appearance={{
@@ -39,7 +34,7 @@ export default async function RootLayout({ children }) {
     >
       <html lang="en" suppressHydrationWarning>
         <body className={`sv-body ${urbanist.className}`}>
-          <KitchenProvider signedIn={!!user} isPro={user?.subscriptionTier === "pro"}>
+          <KitchenProvider>
             <AppShell>{children}</AppShell>
           </KitchenProvider>
           <Toaster

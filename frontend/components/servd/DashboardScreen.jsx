@@ -6,13 +6,14 @@ import { useKitchen } from "./KitchenProvider";
 import Plate, { Img } from "./Plate";
 import ShareModal from "./ShareModal";
 import { IconArrowLeft, IconArrowRight, IconBookmark, IconCheck, IconClock, IconFilter, IconFlame, IconList, IconLock, IconPeople, IconPlus, IconShare, IconSwap } from "./icons";
-import { getMealInsights } from "@/actions/meals.actions";
+import { getMealInsights, listMeals, lookupMeals } from "@/actions/meals.actions";
 import { getOrGenerateRecipe } from "@/actions/recipe.actions";
-import { blockReason, cookHref, DIETS, filterCount, fmtTime, fromMealDB, fromServd, heroHref, ingImg, matchOf, NO_FILTERS, passes, scaleAmount, soonUses, SPICE } from "@/lib/servd/recipe";
+import { blockReason, cookHref, DIETS, filterCount, fmtTime, fromMealDB, fromServd, heroHref, thumb, ingImg, matchOf, NO_FILTERS, passes, scaleAmount, soonUses, SPICE } from "@/lib/servd/recipe";
 import { DASH_CUISINES, findArea } from "@/lib/servd/areas";
 import { anim, EASE, heroAnim, motionOff, openHeight, screenAnim, stagger, useSpins, useTween } from "@/lib/servd/motion";
 
-export default function DashboardScreen({ categories, activeCat, heroMeal, cookTitle, cookImg, fromExplore, isRecipeOfDay, feedMeals }) {
+export default function DashboardScreen({ categories, activeCat, heroMeal, cookTitle, cookImg, fromExplore, isRecipeOfDay }) {
+  const [feedMeals, setFeedMeals] = useState([]);
   const k = useKitchen();
   const router = useRouter();
   const rootRef = useRef(null), catRef = useRef(null), saveRef = useRef(null), drawerRef = useRef(null);
@@ -25,11 +26,23 @@ export default function DashboardScreen({ categories, activeCat, heroMeal, cookT
   const [catInd, setCatInd] = useState(null);
 
   // ── data ────────────────────────────────────────────────────────────────
+  // Hero first, then the "Cook next" feed, then AI insights for all of them.
   useEffect(() => {
-    const meals = [heroMeal, ...feedMeals].filter(Boolean);
-    if (!meals.length) return;
-    getMealInsights(meals).then(setInsights).catch(() => {});
-  }, [heroMeal, feedMeals]);
+    let live = true;
+    const heroOnly = heroMeal ? getMealInsights([heroMeal]).then((i) => live && setInsights((c) => ({ ...c, ...i }))).catch(() => {}) : null;
+    if (!activeCat) return () => { live = false; };
+    listMeals("category", activeCat)
+      .then((list) => lookupMeals(list.filter((m) => m.id !== heroMeal?.idMeal).slice(0, 6).map((m) => m.id)))
+      .then(async (meals) => {
+        if (!live) return;
+        setFeedMeals(meals);
+        await heroOnly;
+        const ins = await getMealInsights(meals);
+        if (live) setInsights((c) => ({ ...c, ...ins }));
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [heroMeal, activeCat]);
 
   useEffect(() => {
     if (!cookTitle) return;
@@ -318,7 +331,7 @@ export default function DashboardScreen({ categories, activeCat, heroMeal, cookT
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: 14 }}>
             {cookNext.map(({ x, soon, match }) => (
               <Link key={x.key} href={heroHref(x)} data-card="1" className="sv-dash-card" style={{ position: "relative", display: "flex", alignItems: "center", gap: 16, padding: 14, borderRadius: 22 }}>
-                <div style={{ width: 84, height: 84, flex: "none", borderRadius: "50%", overflow: "hidden", background: "#E8D6C3", boxShadow: "0 10px 20px -10px rgba(0,0,0,.4), 0 0 0 4px #fff" }}><Img src={x.img} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                <div style={{ width: 84, height: 84, flex: "none", borderRadius: "50%", overflow: "hidden", background: "#E8D6C3", boxShadow: "0 10px 20px -10px rgba(0,0,0,.4), 0 0 0 4px #fff" }}><Img src={thumb(x.img)} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, paddingRight: 30 }}>
                   <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.2, color: "#121212" }}>{x.title}</div>
                   <div style={{ fontSize: 14, color: "#6A6A72" }}>{fmtTime(x.time)}</div>

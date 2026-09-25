@@ -4,7 +4,8 @@
 // straight away and sync to Strapi through server actions.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { toast as sonner } from "sonner";
-import { getKitchenState, addShoppingItems, setShoppingItemDone, removeShoppingItem, setPlanSlot, clearPlanSlot, clearPlan as clearPlanAction, saveDietPreferences } from "@/actions/kitchen.actions";
+import { useAuth } from "@clerk/nextjs";
+import { getKitchenState, refreshAccount, addShoppingItems, setShoppingItemDone, removeShoppingItem, setPlanSlot, clearPlanSlot, clearPlan as clearPlanAction, saveDietPreferences } from "@/actions/kitchen.actions";
 import { addPantryItems, deletePantryItem, fillMissingExpiry, saveLeftover as saveLeftoverAction } from "@/actions/pantry.actions";
 import { saveRecipeByTitle, unsaveRecipeByTitle } from "@/actions/recipe.actions";
 import { daysUntil, listHas, NO_FILTERS, sameIngredient } from "@/lib/servd/recipe";
@@ -19,10 +20,12 @@ const lc = (s) => String(s || "").toLowerCase();
 const raf2 = (cb) => requestAnimationFrame(() => requestAnimationFrame(cb));
 const snapshot = (r) => ({ key: r.key, source: r.source, mealId: r.mealId || null, title: r.title, img: r.img, ings: (r.ings || []).map((i) => ({ name: i.name, amount: i.amount })) });
 
-export default function KitchenProvider({ signedIn: initialSignedIn, isPro: initialPro, children }) {
-  const [signedIn, setSignedIn] = useState(!!initialSignedIn);
-  const [isPro, setIsPro] = useState(!!initialPro);
-  const [loaded, setLoaded] = useState(!initialSignedIn);
+export default function KitchenProvider({ children }) {
+  // Clerk knows who is signed in without a server round trip.
+  const { isLoaded: authLoaded, isSignedIn, userId } = useAuth();
+  const signedIn = !!isSignedIn;
+  const [isPro, setIsPro] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [pantry, setPantry] = useState([]);
   const [shop, setShop] = useState([]);
   const [plan, setPlan] = useState({});
@@ -46,17 +49,21 @@ export default function KitchenProvider({ signedIn: initialSignedIn, isPro: init
   const fail = useCallback((e, fallback) => sonner.error(e?.message || fallback), []);
 
   // ── load ──────────────────────────────────────────────────────────────
-  const refresh = useCallback(async () => {
+  const apply = useCallback((s) => {
+    setIsPro(!!s.isPro);
+    setPantry(s.pantry.map(withDays));
+    setShop(s.shop);
+    setPlan(Object.fromEntries(s.plan.map((e) => [e.slot, e])));
+    setSaved(new Set(s.savedTitles.map(lc)));
+    if (s.preferences?.diet) setFiltersState({ ...NO_FILTERS, ...s.preferences.diet });
+  }, []);
+
+  const refresh = useCallback(async (fetcher = getKitchenState) => {
     try {
-      const s = await getKitchenState();
-      setSignedIn(!!s.signedIn);
+      const s = await fetcher();
       if (!s.signedIn) return;
-      setIsPro(!!s.isPro);
-      setPantry(s.pantry.map(withDays));
-      setShop(s.shop);
-      setPlan(Object.fromEntries(s.plan.map((e) => [e.slot, e])));
-      setSaved(new Set(s.savedTitles.map(lc)));
-      if (s.preferences?.diet) setFiltersState({ ...NO_FILTERS, ...s.preferences.diet });
+      try { sessionStorage.setItem(`servd-kitchen:${userId}`, JSON.stringify(s)); } catch {}
+      apply(s);
       if (s.pantry.some((p) => !p.expiresAt && !p.isLeftover)) {
         fillMissingExpiry()
           .then((r) => {
@@ -70,16 +77,47 @@ export default function KitchenProvider({ signedIn: initialSignedIn, isPro: init
     } finally {
       setLoaded(true);
     }
-  }, [fail]);
+  }, [fail, apply, userId]);
+
+  // Load when Clerk reports a signed-in user (including right after signing in
+  // in the modal). Show the last known state from this tab instantly, then
+  // refresh it in the background.
+  useEffect(() => {
+    if (!authLoaded) return;
+    if (!isSignedIn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset on sign-out
+      setLoaded(true);
+      setIsPro(false);
+      setPantry([]);
+      setShop([]);
+      setPlan({});
+      setSaved(new Set());
+      return;
+    }
+    try {
+      const cached = sessionStorage.getItem(`servd-kitchen:${userId}`);
+      if (cached) {
+        apply(JSON.parse(cached));
+        setLoaded(true);
+      }
+    } catch {}
+    refresh();
+  }, [authLoaded, isSignedIn, userId, apply, refresh]);
+
+  // Wake the Strapi backend (Render free tier sleeps) as soon as anyone
+  // opens the app, so it's ready by the time sign-in finishes.
+  useEffect(() => {
+    const url = (process.env.NEXT_PUBLIC_STRAPI_URL || "https://food-backend-e25g.onrender.com").replace(/\/$/, "");
+    fetch(`${url}/_health`, { mode: "no-cors", cache: "no-store" }).catch(() => {});
+  }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load once on mount
-    if (initialSignedIn) refresh();
     try {
       // localStorage is only readable after hydration
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSeen(JSON.parse(localStorage.getItem("servd-seen") || "[]"));
     } catch {}
-  }, [initialSignedIn, refresh]);
+  }, []);
 
   // ── helpers ───────────────────────────────────────────────────────────
   const inPantry = useCallback((name) => listHas(pantry, name), [pantry]);
@@ -306,6 +344,12 @@ export default function KitchenProvider({ signedIn: initialSignedIn, isPro: init
     });
   }, []);
 
+  // After a Pro payment: show Pro straight away, then re-read the account.
+  const afterUpgrade = useCallback(() => {
+    setIsPro(true);
+    refresh(refreshAccount);
+  }, [refresh]);
+
   // ── current recipe & history ──────────────────────────────────────────
   const setCurrent = useCallback((recipe, serves) => {
     setCurrentState(recipe ? { recipe, serves: serves || 2 } : null);
@@ -319,7 +363,7 @@ export default function KitchenProvider({ signedIn: initialSignedIn, isPro: init
 
   const value = useMemo(
     () => ({
-      signedIn, isPro, setIsPro, loaded, refresh,
+      signedIn, isPro, setIsPro, afterUpgrade, loaded, refresh,
       pantry, shop, plan, filters, setFilters, panelTab, setPanelTab,
       toast: toastMsg, showToast,
       current, setCurrent, seen, cook, setCook,
@@ -330,7 +374,7 @@ export default function KitchenProvider({ signedIn: initialSignedIn, isPro: init
       toggleSave, forgetSaved,
       refs: { pantryListRef, shopListRef, countRef, shopCountRef },
     }),
-    [signedIn, isPro, loaded, refresh, pantry, shop, plan, filters, setFilters, panelTab, toastMsg, showToast, current, setCurrent, seen, cook, inPantry, inShop, isSaved, savingKey, addToPantry, removePantry, saveLeftover, addToShop, toggleShop, removeShop, moveBought, placeInSlot, removeSlot, clearPlan, toggleSave, forgetSaved]
+    [signedIn, isPro, afterUpgrade, loaded, refresh, pantry, shop, plan, filters, setFilters, panelTab, toastMsg, showToast, current, setCurrent, seen, cook, inPantry, inShop, isSaved, savingKey, addToPantry, removePantry, saveLeftover, addToShop, toggleShop, removeShop, moveBought, placeInSlot, removeSlot, clearPlan, toggleSave, forgetSaved]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

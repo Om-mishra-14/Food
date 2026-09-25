@@ -1,5 +1,5 @@
 import { getCategories, getRecipeOfTheDay } from "@/actions/mealdb.actions";
-import { listMeals, lookupMeal, lookupMeals } from "@/actions/meals.actions";
+import { listMeals, lookupMeal } from "@/actions/meals.actions";
 import DashboardScreen from "@/components/servd/DashboardScreen";
 
 // ?meal=<TheMealDB id> opens that dish, ?cook=<title> opens a Servd recipe,
@@ -18,16 +18,12 @@ export default async function DashboardPage({ searchParams }) {
   if (sp.meal) heroMeal = await lookupMeal(sp.meal).catch(() => null);
 
   const activeCat = sp.cat || heroMeal?.strCategory || null;
-  let feed = [];
-  if (activeCat) {
-    const list = await listMeals("category", activeCat).catch(() => []);
-    if (sp.cat && !heroMeal && list.length) {
-      // a stable "pick of the day" within the category
-      heroMeal = await lookupMeal(list[dayIndex() % list.length].id).catch(() => null);
-    }
-    const others = list.filter((m) => m.id !== heroMeal?.idMeal).slice(0, 6);
-    feed = await lookupMeals(others.map((m) => m.id)).catch(() => []);
+  if (sp.cat && !heroMeal) {
+    const list = await listMeals("category", sp.cat).catch(() => []);
+    // a stable "pick of the day" within the category
+    if (list.length) heroMeal = await lookupMeal(list[dayIndex() % list.length].id).catch(() => null);
   }
+  // "Cook next" is loaded by the client after the hero is on screen.
 
   return (
     <DashboardScreen
@@ -39,7 +35,6 @@ export default async function DashboardPage({ searchParams }) {
       cookImg={sp.img || ""}
       fromExplore={sp.from === "explore"}
       isRecipeOfDay={!sp.meal && !sp.cook && !sp.cat}
-      feedMeals={feed}
     />
   );
 }

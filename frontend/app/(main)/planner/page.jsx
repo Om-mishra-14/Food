@@ -6,7 +6,7 @@ import { getSavedRecipes } from "@/actions/recipe.actions";
 import { useKitchen } from "@/components/servd/KitchenProvider";
 import { Img } from "@/components/servd/Plate";
 import { IconX } from "@/components/servd/icons";
-import { fromServd, listHas, passes, scaleAmount } from "@/lib/servd/recipe";
+import { fromServd, listHas, passes, scaleAmount, thumb } from "@/lib/servd/recipe";
 import { stagger, UP } from "@/lib/servd/motion";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -78,7 +78,7 @@ export default function PlannerPage() {
         {x ? (
           <>
             <div data-cellinner="1" draggable={!compact} onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData("text/plain", "move:" + slot); }} style={{ width: compact ? 54 : 62, height: compact ? 54 : 62, borderRadius: "50%", overflow: "hidden", boxShadow: "0 8px 16px -8px rgba(0,0,0,.45), 0 0 0 3px #fff", cursor: compact ? "default" : "grab" }}>
-              <Img src={x.img} draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <Img src={thumb(x.img)} loading="lazy" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.2 }}>{x.title}</div>
             <button onClick={(e) => { e.stopPropagation(); k.removeSlot(slot); }} title="Remove" className="sv-circle-btn sv-x sv-plan-x" style={{ position: "absolute", top: compact ? 4 : 6, right: compact ? 4 : 6 }}>
@@ -131,7 +131,7 @@ export default function PlannerPage() {
                 className="sv-tray"
                 style={{ display: "flex", alignItems: "center", gap: 10, height: 56, padding: "0 18px 0 6px", borderRadius: 999, background: on ? "#121212" : "#fff", color: on ? "#fff" : "#121212", border: `1.5px solid ${on ? "#121212" : "#E1E1E6"}`, fontSize: 15, fontWeight: 600, cursor: "grab", userSelect: "none" }}
               >
-                <Img src={t.img} draggable={false} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+                <Img src={thumb(t.img)} loading="lazy" draggable={false} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
                 {t.title}
               </div>
             );
