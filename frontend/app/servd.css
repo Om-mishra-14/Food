@@ -284,6 +284,16 @@ body.sv-body {
 .sv-tray { transition: all 0.25s var(--sv-ease); }
 .sv-tray:hover { transform: translateY(-2px); }
 
+/* install-as-app card */
+.sv-install {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 460;
+  width: min(460px, calc(100vw - 24px)); box-sizing: border-box;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 12px 12px 14px; border-radius: 24px;
+  background: #121212; color: #fff;
+  box-shadow: 0 24px 50px -16px rgba(0, 0, 0, 0.6);
+}
+
 /* ── misc ──────────────────────────────────────────────────────────────── */
 .sv-toast {
   position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 450;
@@ -315,7 +325,8 @@ body.sv-body {
 
 /* ── phones & upright tablets: bottom tab bar ──────────────────────────── */
 @media (max-width: 819px) {
-  .sv-root { padding: 10px 8px calc(96px + env(safe-area-inset-bottom)); }
+  .sv-root { padding: calc(10px + env(safe-area-inset-top)) 8px calc(96px + env(safe-area-inset-bottom)); }
+  .sv-install { bottom: calc(92px + env(safe-area-inset-bottom)); }
   .sv-shell { border-radius: 26px; padding: 8px; gap: 10px; }
   .sv-body-row { gap: 10px; }
   .sv-header { padding: 10px 10px 10px 18px; }

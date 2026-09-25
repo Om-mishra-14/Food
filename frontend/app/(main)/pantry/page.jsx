@@ -8,7 +8,7 @@ import { getRecipesByPantryIngredients } from "@/actions/recipe.actions";
 import { useKitchen } from "@/components/servd/KitchenProvider";
 import { Img } from "@/components/servd/Plate";
 import { IconCamera, IconCheck, IconPlus, IconScan, IconSparkle, IconUpload, IconX } from "@/components/servd/icons";
-import { cookHref, ingImg } from "@/lib/servd/recipe";
+import { cookHref } from "@/lib/servd/recipe";
 import { anim, motionOff, SPRING, stagger, UP } from "@/lib/servd/motion";
 
 const SAMPLE = "/pantry-sample.webp";
@@ -241,7 +241,7 @@ export default function PantryPage() {
                 const have = k.inPantry(d.name);
                 return (
                   <div key={d.name} data-row="1" style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px 10px 10px", borderRadius: 20, border: "1.5px dashed #D2D2D8", background: "#fff" }}>
-                    <div style={{ width: 50, height: 50, flex: "none", borderRadius: "50%", background: "#F4F4F6", display: "grid", placeItems: "center" }}><Img src={ingImg(d.name)} style={{ width: 38, height: 38, objectFit: "contain" }} /></div>
+                    <div style={{ width: 50, height: 50, flex: "none", borderRadius: "50%", background: "#F4F4F6", display: "grid", placeItems: "center" }}><Img ingredient={d.name} style={{ width: 38, height: 38, objectFit: "contain" }} /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 17, fontWeight: 600 }}>{d.name}</div>
                       <div style={{ fontSize: 14, color: "#6A6A72" }}>{[d.quantity, `${d.confidence}% sure`].filter(Boolean).join(" · ")}</div>

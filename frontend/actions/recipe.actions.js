@@ -1,6 +1,7 @@
 "use server";
 
 import { checkUser } from "@/lib/checkUser";
+import { findDishPhoto } from "@/lib/strapi";
 import OpenAI from "openai";
 
 const client = new OpenAI({
@@ -10,6 +11,14 @@ const STRAPI_URL =
   process.env.NEXT_PUBLIC_STRAPI_URL || "https://food-backend-e25g.onrender.com";
 const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN;
 const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY;
+
+function storeRecipeImage(documentId, imageUrl) {
+  fetch(`${STRAPI_URL}/api/recipes/${documentId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${STRAPI_API_TOKEN}` },
+    body: JSON.stringify({ data: { imageUrl } }),
+  }).catch(() => {});
+}
 
 // Helper function to normalize recipe title
 function normalizeTitle(title) {
@@ -118,10 +127,17 @@ export async function getOrGenerateRecipe(formData) {
           isSaved = savedData.data && savedData.data.length > 0;
         }
 
+        const found = searchData.data[0];
+        // Older recipes were saved without a photo: find one and store it.
+        if (!found.imageUrl) {
+          found.imageUrl = imageOverride || (await findDishPhoto(found.title));
+          if (found.imageUrl) storeRecipeImage(found.documentId, found.imageUrl);
+        }
+
         return {
           success: true,
-          recipe: searchData.data[0],
-          recipeId: searchData.data[0].id,
+          recipe: found,
+          recipeId: found.id,
           isSaved: isSaved,
           fromDatabase: true,
           isPro,
@@ -278,7 +294,8 @@ Guidelines:
 
     // Step 3: Fetch image from Unsplash
     console.log("🖼️ Fetching image from Unsplash...");
-    const imageUrl = imageOverride || (await fetchRecipeImage(normalizedTitle));
+    const imageUrl =
+      imageOverride || (await fetchRecipeImage(normalizedTitle)) || (await findDishPhoto(normalizedTitle));
 
     // Step 4: Save generated recipe to database
     const strapiRecipeData = {
@@ -614,6 +631,17 @@ export async function getSavedRecipes() {
     const recipes = data.data
       .map((savedRecipe) => savedRecipe.recipe)
       .filter(Boolean); // Remove any null recipes
+
+    // Fill in missing photos (older AI recipes) and remember them.
+    await Promise.all(
+      recipes
+        .filter((r) => !r.imageUrl)
+        .slice(0, 8)
+        .map(async (r) => {
+          r.imageUrl = await findDishPhoto(r.title);
+          if (r.imageUrl) storeRecipeImage(r.documentId, r.imageUrl);
+        }),
+    );
 
     return {
       success: true,

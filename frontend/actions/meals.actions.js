@@ -4,7 +4,7 @@
 // cached in Strapi so each meal is analysed once for everyone.
 import { unstable_cache } from "next/cache";
 import { checkUser } from "@/lib/checkUser";
-import { strapi, askJson } from "@/lib/strapi";
+import { strapi, askJson, findDishPhoto } from "@/lib/strapi";
 import { MEALDB_API, mealIngredients } from "@/lib/servd/recipe";
 
 // TheMealDB is a free API that sometimes times out or answers with an HTML
@@ -68,10 +68,10 @@ const aiCuisineDishes = unstable_cache(
       `List 24 authentic, popular ${area} dishes that people commonly cook at home, covering mains, breads/rice, snacks and desserts. Use the name the dish is best known by (e.g. "Butter Chicken", "Chole Bhature", "Masala Dosa"). Return ONLY a JSON array of strings, no markdown.`
     );
     const titles = (Array.isArray(list) ? list : []).map((t) => String(t).trim()).filter(Boolean).slice(0, 24);
-    const imgs = await Promise.all(titles.map((t) => unsplashImage(`${t} ${area} food`)));
+    const imgs = await Promise.all(titles.map(async (t) => (await unsplashImage(`${t} ${area} food`)) || (await findDishPhoto(t))));
     return titles.map((title, i) => ({ id: "ai:" + title, title, img: imgs[i], source: "ai" }));
   },
-  ["ai-cuisine-dishes-v1"],
+  ["ai-cuisine-dishes-v2"],
   { revalidate: 604800 }
 );
 

@@ -2,8 +2,44 @@
 // TheMealDB meals and Servd AI recipes, plus formatting and pantry matching.
 
 export const MEALDB_API = "https://www.themealdb.com/api/json/v1/1";
-export const ingImg = (n) =>
-  `https://www.themealdb.com/images/ingredients/${encodeURIComponent(n)}-Small.png`;
+const ING_BASE = "https://www.themealdb.com/images/ingredients/";
+const tc = (w) => w.replace(/\b\w/g, (c) => c.toUpperCase());
+export const ingImg = (n) => `${ING_BASE}${encodeURIComponent(tc(String(n || "").trim()))}-Small.png`;
+
+// TheMealDB only has photos for its own ingredient names, so try a few close
+// variants of what the AI or the user typed: "Cheddar cheese" → "Cheddar Cheese",
+// "Tomato" ↔ "Tomatoes", then the main word ("Cheese").
+export function ingImgs(name) {
+  const raw = String(name || "").replace(/\(.*?\)/g, "").replace(/[^a-zA-Z\s-]/g, " ").replace(/\s+/g, " ").trim();
+  if (!raw) return [];
+  const words = raw.split(" ");
+  const last = words[words.length - 1];
+  const plural = (w) => (/(s|x|z|ch|sh|[^aeiou]o)$/i.test(w) ? w + "es" : /[^aeiou]y$/i.test(w) ? w.slice(0, -1) + "ies" : w + "s");
+  const single = (w) => (/ies$/i.test(w) ? w.slice(0, -3) + "y" : /(oes|ches|shes|xes)$/i.test(w) ? w.slice(0, -2) : /s$/i.test(w) && !/ss$/i.test(w) ? w.slice(0, -1) : w);
+  const names = [
+    raw,
+    [...words.slice(0, -1), single(last)].join(" "),
+    [...words.slice(0, -1), plural(single(last))].join(" "),
+    single(last),
+    plural(single(last)),
+  ];
+  const seen = new Set();
+  return names
+    .map((x) => tc(x.toLowerCase()))
+    .filter((x) => x && !seen.has(x) && seen.add(x))
+    .map((x) => `${ING_BASE}${encodeURIComponent(x)}-Small.png`);
+}
+
+// Last resort for ingredients: a soft circle with the first letter.
+export function ingFallback(name) {
+  const letter = (String(name || "?").trim()[0] || "?").toUpperCase().replace(/[<>&"]/g, "");
+  return (
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#FDECEC"/><text x="50" y="50" dy=".35em" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="44" font-weight="700" fill="#E11D24">${letter}</text></svg>`
+    )
+  );
+}
 
 // TheMealDB serves a ~250px version at "<photo>/preview": use it for thumbnails.
 export const thumb = (url) =>

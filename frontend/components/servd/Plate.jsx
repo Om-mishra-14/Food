@@ -1,26 +1,52 @@
 "use client";
-import { FALLBACK_IMG } from "@/lib/servd/recipe";
+import { useCallback, useEffect, useRef } from "react";
+import { FALLBACK_IMG, ingFallback, ingImgs } from "@/lib/servd/recipe";
 
 // <img> that swaps to a beige plate placeholder when the photo fails to load.
-export function Img({ src, alt = "", style, ...rest }) {
+// <img> that works through fallbacks when a photo is missing:
+// "<photo>/preview" → full photo → each of `alts` → `fallback` (beige plate by
+// default). Pass `ingredient` to use TheMealDB ingredient-name variants.
+// It also catches photos that failed before React hydrated, which never
+// fire onError on the client.
+export function Img({ src, alt = "", style, alts, fallback, ingredient, ...rest }) {
+  const ref = useRef(null);
+  const candidates = ingredient ? ingImgs(ingredient) : [src, ...(alts || [])];
+  const chain = candidates.filter(Boolean);
+  const last = fallback || (ingredient ? ingFallback(ingredient) : FALLBACK_IMG);
+  const first = chain[0] || last;
+  const key = chain.join("|");
+
+  const next = useCallback(
+    (el) => {
+      const cur = el.getAttribute("src") || "";
+      if (/\/preview$/.test(cur)) return (el.src = cur.replace(/\/preview$/, ""));
+      const step = Number(el.dataset.step || 0) + 1;
+      el.dataset.step = String(step);
+      const upcoming = chain[step];
+      if (upcoming) el.src = upcoming;
+      else if (cur !== last) el.src = last;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key, last]
+  );
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.dataset.step = "0";
+    if (el.complete && el.naturalWidth === 0 && el.getAttribute("src") !== last) next(el);
+  }, [key, last, next]);
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src || FALLBACK_IMG}
+      ref={ref}
+      src={first}
       alt={alt}
       style={style}
-      onError={(e) => {
-        const el = e.currentTarget;
-        // thumbnail missing: try the full-size photo once
-        if (/\/preview$/.test(el.src) && !el.dataset.full) {
-          el.dataset.full = "1";
-          el.src = el.src.replace(/\/preview$/, "");
-          return;
-        }
-        if (e.currentTarget.dataset.fb) return;
-        e.currentTarget.dataset.fb = "1";
-        e.currentTarget.src = FALLBACK_IMG;
-      }}
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={(e) => next(e.currentTarget)}
       {...rest}
     />
   );
