@@ -2,7 +2,6 @@
 // Razorpay checkout for Pro, moved from the old PricingSection component.
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 // Always use production backend for payments - env vars may not be available on Vercel
@@ -23,7 +22,6 @@ function loadRazorpayScript() {
 export default function useProUpgrade({ onUpgraded } = {}) {
   const [loading, setLoading] = useState(false);
   const { user } = useUser();
-  const router = useRouter();
 
   const upgrade = async (billingCycle = "monthly") => {
     if (!user) {
@@ -86,9 +84,8 @@ export default function useProUpgrade({ onUpgraded } = {}) {
               throw new Error("Invalid verification response from server");
             }
             if (verifyRes.ok && verifyData.success) {
-              toast.success("Welcome to Pro! Refreshing your account…");
+              toast.success("Welcome to Pro!");
               onUpgraded?.();
-              setTimeout(() => router.refresh(), 1500);
             } else {
               toast.error(verifyData.error?.message || verifyData.message || "Payment verified but upgrade failed. Contact support.");
             }

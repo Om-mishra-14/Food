@@ -10,6 +10,13 @@ export function Img({ src, alt = "", style, ...rest }) {
       alt={alt}
       style={style}
       onError={(e) => {
+        const el = e.currentTarget;
+        // thumbnail missing: try the full-size photo once
+        if (/\/preview$/.test(el.src) && !el.dataset.full) {
+          el.dataset.full = "1";
+          el.src = el.src.replace(/\/preview$/, "");
+          return;
+        }
         if (e.currentTarget.dataset.fb) return;
         e.currentTarget.dataset.fb = "1";
         e.currentTarget.src = FALLBACK_IMG;

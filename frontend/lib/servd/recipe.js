@@ -5,6 +5,10 @@ export const MEALDB_API = "https://www.themealdb.com/api/json/v1/1";
 export const ingImg = (n) =>
   `https://www.themealdb.com/images/ingredients/${encodeURIComponent(n)}-Small.png`;
 
+// TheMealDB serves a ~250px version at "<photo>/preview": use it for thumbnails.
+export const thumb = (url) =>
+  /themealdb\.com\/images\/media\/meals\/[^/]+\.(jpg|png)$/i.test(url || "") ? `${url}/preview` : url;
+
 export const FALLBACK_IMG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(

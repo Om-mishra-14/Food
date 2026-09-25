@@ -1,7 +1,7 @@
 "use server";
 // Shopping list, weekly meal planner and diet preferences, plus one call that
 // loads everything the app shell needs for a signed-in user.
-import { checkUser } from "@/lib/checkUser";
+import { checkUser, forgetCachedUser } from "@/lib/checkUser";
 import { strapi, ownedDoc, askJson } from "@/lib/strapi";
 import { getPantryItems } from "./pantry.actions";
 
@@ -45,6 +45,13 @@ export async function getKitchenState() {
     savedTitles: (saved.data || []).map((s) => s.recipe?.title).filter(Boolean),
     preferences: user.preferences || {},
   };
+}
+
+// After a Pro upgrade: drop the cached user so the new tier is read from Strapi.
+export async function refreshAccount() {
+  const user = await checkUser();
+  if (user) forgetCachedUser(user.clerkid);
+  return getKitchenState();
 }
 
 // ── shopping list ───────────────────────────────────────────────────────────
@@ -141,6 +148,7 @@ export async function saveDietPreferences(filters) {
     method: "PUT",
     body: { preferences: { ...(user.preferences || {}), diet: clean } },
   });
+  forgetCachedUser(user.clerkid);
   return { success: true };
 }
 

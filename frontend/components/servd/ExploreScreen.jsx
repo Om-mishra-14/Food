@@ -5,6 +5,7 @@ import { Img } from "./Plate";
 import { IconArrowRight, IconSearch } from "./icons";
 import { getCuisineDishes } from "@/actions/meals.actions";
 import { AREAS, REGIONS } from "@/lib/servd/areas";
+import { thumb } from "@/lib/servd/recipe";
 import { anim, stagger, UP } from "@/lib/servd/motion";
 
 export default function ExploreScreen({ initialArea }) {
@@ -135,7 +136,7 @@ export default function ExploreScreen({ initialArea }) {
         <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", paddingRight: 10, paddingLeft: 22 }}>
           {list.slice(0, 3).map((m) => (
             <div key={m.id} data-explate="1" style={{ width: "clamp(78px, 14vw, 120px)", height: "clamp(78px, 14vw, 120px)", marginLeft: -22, borderRadius: "50%", background: "#fff", padding: 7, boxSizing: "border-box", boxShadow: "0 20px 40px -16px rgba(0,0,0,.7)" }}>
-              <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", background: "#3A3A40" }}><Img src={m.img} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
+              <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", background: "#3A3A40" }}><Img src={thumb(m.img)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /></div>
             </div>
           ))}
         </div>
@@ -163,7 +164,7 @@ export default function ExploreScreen({ initialArea }) {
             {shown.map((m) => (
               <button key={m.id} data-excard="1" onClick={() => open(m)} className="sv-dash-card sv-excard" style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10, padding: "10px 10px 14px", borderRadius: 24 }}>
                 <div style={{ position: "relative", aspectRatio: 1, borderRadius: 18, overflow: "hidden", background: "#E8D6C3" }}>
-                  <Img src={m.img} alt={m.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <Img src={thumb(m.img)} alt={m.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   {m.source === "ai" && <span style={{ position: "absolute", left: 10, top: 10, background: "#E11D24", color: "#fff", borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 800 }}>AI pick</span>}
                   {pending && opening === m.id && <div style={{ position: "absolute", inset: 0, background: "rgba(18,18,18,.55)", display: "grid", placeItems: "center", color: "#fff", fontSize: 15, fontWeight: 700 }}>Opening…</div>}
                 </div>
