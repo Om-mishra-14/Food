@@ -1,608 +1,493 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Clock,
-  Users,
-  ChefHat,
-  Flame,
-  Lightbulb,
-  Bookmark,
-  BookmarkCheck,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Download,
-} from "lucide-react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import useFetch from "@/hooks/use-fetch";
-import {
-  getOrGenerateRecipe,
-  saveRecipeToCollection,
-  removeRecipeFromCollection,
-} from "@/actions/recipe.actions";
-import { toast } from "sonner";
-import Image from "next/image";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import { RecipePDF } from "@/components/RecipePDF";
-import { ClockLoader } from "react-spinners";
-import ProLockedSection from "@/components/ProLockedSection";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getOrGenerateRecipe } from "@/actions/recipe.actions";
+import { suggestSubstitutions } from "@/actions/kitchen.actions";
+import { useKitchen } from "@/components/servd/KitchenProvider";
+import Plate from "@/components/servd/Plate";
+import ShareModal from "@/components/servd/ShareModal";
+import { IconArrowLeft, IconArrowRight, IconBulb, IconCheck, IconChef, IconMic, IconSearch, IconTimer } from "@/components/servd/icons";
+import { cookHref, fmtClock, fmtTime, fromServd, scaleAmount } from "@/lib/servd/recipe";
+import { anim, motionOff, SPRING, stagger, UP, useSpins } from "@/lib/servd/motion";
+
+export default function RecipePage() {
+  return (
+    <Suspense fallback={<Preparing title="" />}>
+      <RecipeContent />
+    </Suspense>
+  );
+}
 
 function RecipeContent() {
-  const searchParams = useSearchParams();
+  const sp = useSearchParams();
+  const title = sp.get("cook");
+  if (!title) return <HowToCook />;
+  return <CookMode key={title} title={title} serves={Number(sp.get("serves")) || null} img={sp.get("img") || ""} />;
+}
+
+// ── "How to cook?" — the old header modal, now its own screen ─────────────
+function HowToCook() {
   const router = useRouter();
-  const recipeName = searchParams.get("cook");
-
-  const [recipe, setRecipe] = useState(null);
-  const [recipeId, setRecipeId] = useState(null);
-  const [isSaved, setIsSaved] = useState(false);
-
-  // Get or generate recipe
-  const {
-    loading: loadingRecipe,
-    data: recipeData,
-    fn: fetchRecipe,
-  } = useFetch(getOrGenerateRecipe);
-
-  // Save to collection
-  const {
-    loading: saving,
-    data: saveData,
-    fn: saveToCollection,
-  } = useFetch(saveRecipeToCollection);
-
-  // Remove from collection
-  const {
-    loading: removing,
-    data: removeData,
-    fn: removeFromCollection,
-  } = useFetch(removeRecipeFromCollection);
-
-  // Fetch recipe on mount
-  useEffect(() => {
-    if (recipeName && !recipe) {
-      const formData = new FormData();
-      formData.append("recipeName", recipeName);
-      fetchRecipe(formData);
-    }
-  }, [recipeName]);
-
-  // Update recipe when data arrives
-  useEffect(() => {
-    if (recipeData?.success) {
-      setRecipe(recipeData.recipe);
-      setRecipeId(recipeData.recipeId);
-      setIsSaved(recipeData.isSaved);
-
-      if (recipeData.fromDatabase) {
-        toast.success("Recipe loaded from database");
-      } else {
-        toast.success("New recipe generated and saved!");
-      }
-    }
-  }, [recipeData]);
-
-  // Handle save success
-  useEffect(() => {
-    if (saveData?.success) {
-      if (saveData.alreadySaved) {
-        toast.info("Recipe is already in your collection");
-      } else {
-        setIsSaved(true);
-        toast.success("Recipe saved to your collection!");
-      }
-    }
-  }, [saveData]);
-
-  // Handle remove success
-  useEffect(() => {
-    if (removeData?.success) {
-      setIsSaved(false);
-      toast.success("Recipe removed from collection");
-    }
-  }, [removeData]);
-
-  // Toggle save/unsave
-  const handleToggleSave = async () => {
-    if (!recipeId) return;
-
-    const formData = new FormData();
-    formData.append("recipeId", recipeId);
-
-    if (isSaved) {
-      await removeFromCollection(formData);
-    } else {
-      await saveToCollection(formData);
-    }
+  const { seen, current } = useKitchen();
+  const [q, setQ] = useState("");
+  const ref = useRef(null);
+  useEffect(() => stagger(ref.current, "[data-fade]", UP(16), { duration: 650, step: 90 }), []);
+  const submit = (e) => {
+    e.preventDefault();
+    if (q.trim()) router.push(cookHref(q.trim()));
   };
-
-  // No recipe name in URL
-  if (!recipeName) {
-    return (
-      <div className="min-h-screen bg-stone-50 pt-24 pb-16 px-4">
-        <div className="container mx-auto max-w-4xl text-center py-20">
-          <div className="bg-orange-50 w-20 h-20 border-2 border-orange-200 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-orange-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-stone-900 mb-2">
-            No recipe specified
-          </h2>
-          <p className="text-stone-600 mb-6 font-light">
-            Please select a recipe from the dashboard
-          </p>
-          <Link href="/dashboard">
-            <Button className="bg-orange-600 hover:bg-orange-700">
-              Go to Dashboard
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Loading state
-  if (loadingRecipe === null || loadingRecipe) {
-    return (
-      <div className="min-h-screen bg-stone-50 pt-24 pb-16 px-4">
-        <div className="container mx-auto max-w-4xl">
-          <div className="text-center py-20">
-            <ClockLoader className="mx-auto mb-6" color="#dc6300" />
-            <h2 className="text-3xl font-bold text-stone-900 mb-2 tracking-tight">
-              Preparing Your Recipe
-            </h2>
-            <p className="text-stone-600 font-light">
-              Our AI chef is crafting detailed instructions for{" "}
-              <span className="font-bold text-orange-600">{recipeName}</span>
-              ...
-            </p>
-            <div className="mt-8 max-w-md mx-auto">
-              <div className="flex items-center gap-3 text-sm text-stone-500">
-                <div className="flex-1 h-1 bg-stone-200 overflow-hidden relative">
-                  <div className="absolute left-0 top-0 h-full bg-orange-600 animate-slow-fill" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  console.log(recipe, recipeData);
-
-  // Error state
-  if (loadingRecipe === false && !recipe) {
-    return (
-      <div className="min-h-screen bg-stone-50 pt-24 pb-16 px-4">
-        <div className="container mx-auto max-w-4xl text-center py-20">
-          <div className="bg-red-50 w-20 h-20 border-2 border-red-200 flex items-center justify-center mx-auto mb-6">
-            <AlertCircle className="w-10 h-10 text-red-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-stone-900 mb-2">
-            Failed to load recipe
-          </h2>
-          <p className="text-stone-600 mb-6 font-light">
-            Something went wrong while loading the recipe. Please try again.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Button
-              onClick={() => router.back()}
-              variant="outline"
-              className="border-2 border-stone-900 hover:bg-stone-900 hover:text-white"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Go Back
-            </Button>
-            <Button
-              onClick={() => window.location.reload()}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              Retry
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Main recipe view
   return (
-    <div className="min-h-screen bg-stone-50 pt-24 pb-16 px-4">
-      <div className="container mx-auto max-w-5xl">
-        {/* Header */}
-        <div className="mb-8">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-stone-600 hover:text-orange-600 transition-colors mb-6 font-medium"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
-
-          {/* Title Section */}
-          <div className="bg-white p-8 md:p-10 border-2 border-stone-200 mb-6">
-            {/* Badges */}
-            {recipe.imageUrl && (
-              <div className="relative w-full h-72 overflow-hidden mb-7">
-                <Image
-                  src={recipe.imageUrl}
-                  alt={recipe.title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-                  priority
-                />
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-2 mb-4">
-              <Badge
-                variant="outline"
-                className="text-orange-600 border-2 border-orange-200 capitalize"
-              >
-                {recipe.cuisine}
-              </Badge>
-              <Badge
-                variant="outline"
-                className="text-stone-600 border-2 border-stone-200 capitalize"
-              >
-                {recipe.category}
-              </Badge>
-            </div>
-
-            {/* Title */}
-            <h1 className="text-4xl md:text-5xl font-bold text-stone-900 mb-4 tracking-tight">
-              {recipe.title}
-            </h1>
-
-            {/* Description */}
-            <p className="text-lg text-stone-600 mb-6 font-light">
-              {recipe.description}
-            </p>
-
-            {/* Meta Info */}
-            <div className="flex flex-wrap gap-6 text-stone-600 mb-6">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-orange-600" />
-                <span className="font-medium">
-                  {parseInt(recipe.prepTime) + parseInt(recipe.cookTime)} mins
-                  total
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-orange-600" />
-                <span className="font-medium">{recipe.servings} servings</span>
-              </div>
-              {recipe.nutrition?.calories && (
-                <div className="flex items-center gap-2">
-                  <Flame className="w-5 h-5 text-orange-600" />
-                  <span className="font-medium">
-                    {recipe.nutrition.calories} cal/serving
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={handleToggleSave}
-                disabled={saving || removing}
-                className={`${
-                  isSaved
-                    ? "bg-green-600 hover:bg-green-700 border-2 border-green-700"
-                    : "bg-orange-600 hover:bg-orange-700 border-2 border-orange-700"
-                } text-white gap-2 transition-all`}
-              >
-                {saving || removing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {saving ? "Saving..." : "Removing..."}
-                  </>
-                ) : isSaved ? (
-                  <>
-                    <BookmarkCheck className="w-4 h-4" />
-                    Saved to Collection
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="w-4 h-4" />
-                    Save to Collection
-                  </>
-                )}
-              </Button>
-              <PDFDownloadLink
-                document={<RecipePDF recipe={recipe} />}
-                fileName={`${recipe.title
-                  .replace(/\s+/g, "-")
-                  .toLowerCase()}.pdf`}
-              >
-                {({ loading }) => (
-                  <Button
-                    variant="outline"
-                    className="border-2 border-orange-600 text-orange-700 hover:bg-orange-50 gap-2"
-                    disabled={loading}
-                  >
-                    <Download className="w-4 h-4" />
-                    {loading ? "Preparing PDF..." : "Download PDF"}
-                  </Button>
-                )}
-              </PDFDownloadLink>
-            </div>
+    <div ref={ref} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 26, padding: "10px 0 20px" }}>
+      <div data-fade="1" style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <span style={{ width: 72, height: 72, flex: "none", borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center", color: "#fff" }}><IconChef size={32} stroke="#fff" /></span>
+        <div>
+          <h1 className="sv-h1">What would you like to cook?</h1>
+          <p className="sv-lead" style={{ marginTop: 4 }}>Name any dish and our AI chef will walk you through it, step by step.</p>
+        </div>
+      </div>
+      <form data-fade="1" onSubmit={submit} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <label style={{ flex: "1 1 320px", display: "flex", alignItems: "center", gap: 10, height: 60, padding: "0 20px", borderRadius: 999, background: "#fff", border: "1.5px dashed #C9C9D0" }}>
+          <IconSearch />
+          <input className="sv-input" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Butter chicken, Pad thai, Apple crumble" aria-label="Dish name" style={{ fontSize: 17 }} />
+        </label>
+        <button type="submit" className="sv-btn-dark" disabled={!q.trim()} style={{ height: 60, padding: "0 10px 0 28px", fontSize: 17, gap: 18, opacity: q.trim() ? 1 : 0.5 }}>
+          Start cooking
+          <span style={{ width: 42, height: 42, borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}><IconArrowRight /></span>
+        </button>
+      </form>
+      {current?.recipe && (
+        <Link data-fade="1" href={`${cookHref(current.recipe.title)}&serves=${current.serves}${current.recipe.source === "mealdb" ? `&img=${encodeURIComponent(current.recipe.img)}` : ""}`} className="sv-dash-card" style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, borderRadius: 24, color: "#121212" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={current.recipe.img} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", flex: "none", boxShadow: "0 0 0 4px #fff" }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sv-eyebrow" style={{ color: "#E11D24" }}>You were looking at</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{current.recipe.title}</div>
+          </div>
+          <span style={{ width: 40, height: 40, borderRadius: "50%", background: "#121212", display: "grid", placeItems: "center", flex: "none" }}><IconArrowRight size={16} /></span>
+        </Link>
+      )}
+      {seen.length > 0 && (
+        <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="sv-eyebrow">Recently viewed</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {seen.slice(0, 8).map((r) => (
+              <Link key={r.key} href={cookHref(r.title)} className="sv-dash-card" style={{ display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 18px 0 5px", borderRadius: 999, fontSize: 15, fontWeight: 600, color: "#121212" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={r.img} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover" }} />
+                {r.title}
+              </Link>
+            ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Ingredients & Nutrition */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Ingredients */}
-            <div className="bg-white p-6 border-2 border-stone-200 lg:sticky lg:top-24">
-              <h2 className="text-2xl font-bold text-stone-900 mb-4 flex items-center gap-2">
-                <ChefHat className="w-6 h-6 text-orange-600" />
-                Ingredients
-              </h2>
-
-              {/* Group by category */}
-              {Object.entries(
-                recipe.ingredients.reduce((acc, ing) => {
-                  const cat = ing.category || "Other";
-                  if (!acc[cat]) acc[cat] = [];
-                  acc[cat].push(ing);
-                  return acc;
-                }, {}),
-              ).map(([category, items]) => (
-                <div key={category} className="mb-6 last:mb-0">
-                  <h3 className="text-sm font-bold text-stone-500 uppercase tracking-wide mb-3">
-                    {category}
-                  </h3>
-                  <ul className="space-y-2">
-                    {items.map((ingredient, i) => (
-                      <li
-                        key={i}
-                        className="flex justify-between items-start gap-2 text-stone-700 py-2 border-b border-stone-100 last:border-0"
-                      >
-                        <span className="flex-1">{ingredient.item}</span>
-                        <span className="font-bold text-orange-600 text-sm whitespace-nowrap">
-                          {ingredient.amount}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-
-              {/* Nutrition Info */}
-              {recipe.nutrition && (
-                <div className="mt-6 pt-6 border-t-2 border-stone-200">
-                  <h3 className="font-bold text-stone-900 mb-3 uppercase tracking-wide text-sm flex items-center gap-2">
-                    Nutrition (per serving)
-                    {!recipeData.isPro && (
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-                        PRO
-                      </span>
-                    )}
-                  </h3>
-
-                  <ProLockedSection
-                    isPro={recipeData.isPro}
-                    lockText="Nutrition info is Pro-only"
-                  >
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-orange-50 p-3 text-center border-2 border-orange-100">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {recipe.nutrition.calories}
-                        </div>
-                        <div className="text-xs text-stone-500 font-bold uppercase tracking-wide">
-                          Calories
-                        </div>
-                      </div>
-
-                      <div className="bg-stone-50 p-3 text-center border-2 border-stone-100">
-                        <div className="text-2xl font-bold text-stone-900">
-                          {recipe.nutrition.protein}
-                        </div>
-                        <div className="text-xs text-stone-500 font-bold uppercase tracking-wide">
-                          Protein
-                        </div>
-                      </div>
-
-                      <div className="bg-stone-50 p-3 text-center border-2 border-stone-100">
-                        <div className="text-2xl font-bold text-stone-900">
-                          {recipe.nutrition.carbs}
-                        </div>
-                        <div className="text-xs text-stone-500 font-bold uppercase tracking-wide">
-                          Carbs
-                        </div>
-                      </div>
-
-                      <div className="bg-stone-50 p-3 text-center border-2 border-stone-100">
-                        <div className="text-2xl font-bold text-stone-900">
-                          {recipe.nutrition.fat}
-                        </div>
-                        <div className="text-xs text-stone-500 font-bold uppercase tracking-wide">
-                          Fat
-                        </div>
-                      </div>
-                    </div>
-                  </ProLockedSection>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column - Instructions & Tips */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Instructions */}
-            <div className="bg-white p-8 border-2 border-stone-200">
-              <h2 className="text-2xl font-bold text-stone-900 mb-6">
-                Step-by-Step Instructions
-              </h2>
-
-              <div>
-                {recipe.instructions.map((step, index) => (
-                  <div
-                    key={step.step}
-                    className={`relative pl-12 pb-8 ${
-                      index !== recipe.instructions.length - 1
-                        ? "border-l-2 border-orange-300 ml-5"
-                        : "ml-5"
-                    }`}
-                  >
-                    {/* Step Number */}
-                    <div className="absolute -left-5 top-0 w-10 h-10 bg-orange-600 text-white flex items-center justify-center font-bold border-2 border-orange-700">
-                      {step.step}
-                    </div>
-
-                    {/* Step Content */}
-                    <div>
-                      <h3 className="font-bold text-lg text-stone-900 mb-2">
-                        {step.title}
-                      </h3>
-                      <p className="text-stone-700 font-light mb-3">
-                        {step.instruction}
-                      </p>
-                      {step.tip && (
-                        <div className="bg-orange-50 border-l-4 border-orange-600 p-4">
-                          <p className="text-sm text-orange-900 flex items-start gap-2">
-                            <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0 fill-orange-600" />
-                            <span>
-                              <strong className="font-bold">Pro Tip:</strong>{" "}
-                              {step.tip}
-                            </span>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Completion Message */}
-              <div className="mt-8 p-6 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h3 className="font-bold text-green-900 mb-1">
-                      You&apos;re all done!
-                    </h3>
-                    <p className="text-sm text-green-800 font-light">
-                      Plate your masterpiece and enjoy your delicious{" "}
-                      {recipe.title}!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* General Tips */}
-            {recipe.tips && recipe.tips.length > 0 && (
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-8 border-2 border-orange-200">
-                <h2 className="text-2xl font-bold text-stone-900 mb-4 flex items-center gap-2">
-                  <Lightbulb className="w-6 h-6 text-orange-600 fill-orange-600" />
-                  Chef&apos;s Tips & Tricks
-                  {!recipeData.isPro && (
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-                      PRO
-                    </span>
-                  )}
-                </h2>
-
-                <ProLockedSection
-                  isPro={recipeData.isPro}
-                  lockText="Chef tips are Pro-only"
-                  ctaText="Unlock Pro Tips →"
-                >
-                  <ul className="space-y-3">
-                    {recipe.tips.map((tip, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-3 text-stone-700"
-                      >
-                        <CheckCircle2 className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <span className="font-light">{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </ProLockedSection>
-              </div>
-            )}
-
-            {/* Substitutions */}
-            {recipe.substitutions && recipe.substitutions.length > 0 && (
-              <div className="bg-white p-8 border-2 border-stone-200">
-                <h2 className="text-2xl font-bold text-stone-900 mb-4 flex items-center gap-2">
-                  Ingredient Substitutions
-                  {!recipeData.isPro && (
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-semibold">
-                      PRO
-                    </span>
-                  )}
-                </h2>
-
-                <p className="text-stone-600 mb-6 text-sm font-light">
-                  Don&apos;t have everything? Here are some alternatives you can
-                  use:
-                </p>
-
-                <ProLockedSection
-                  isPro={recipeData.isPro}
-                  lockText="Substitutions are Pro-only"
-                >
-                  <div className="space-y-4">
-                    {recipe.substitutions.map((sub, i) => (
-                      <div
-                        key={i}
-                        className="border-b-2 border-stone-100 pb-4 last:border-0 last:pb-0"
-                      >
-                        <h3 className="font-bold text-stone-900 mb-2">
-                          Instead of{" "}
-                          <span className="text-orange-600">
-                            {sub.original}
-                          </span>
-                          :
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {sub.alternatives.map((alt, j) => (
-                            <Badge
-                              key={j}
-                              variant="outline"
-                              className="text-stone-600 border-2 border-stone-200"
-                            >
-                              {alt}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ProLockedSection>
-              </div>
-            )}
-          </div>
-        </div>
+function Preparing({ title }) {
+  return (
+    <div data-screen="1" style={{ display: "flex", flexWrap: "wrap", gap: 44, alignItems: "center", minHeight: 380 }}>
+      <div className="sv-skel" style={{ flex: "0 0 clamp(150px, 40vw, 240px)", aspectRatio: 1, borderRadius: "50%" }} />
+      <div style={{ flex: "1 1 320px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="sv-eyebrow" style={{ color: "#E11D24" }}>Preparing your recipe</div>
+        <div style={{ fontSize: "clamp(30px, 5vw, 44px)", fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1.08 }}>{title}</div>
+        <p style={{ margin: 0, fontSize: 18, color: "#3A3A40" }}>Our AI chef is writing step-by-step instructions. New dishes take a few seconds.</p>
+        <div style={{ height: 6, borderRadius: 6, background: "#E3E3E8", overflow: "hidden", maxWidth: 420 }}><div className="animate-slow-fill" style={{ height: "100%", background: "#E11D24", borderRadius: 6 }} /></div>
       </div>
     </div>
   );
 }
 
-export default function RecipePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-stone-50 pt-24 pb-16 px-4">
-          <div className="container mx-auto max-w-4xl text-center py-20">
-            <Loader2 className="w-16 h-16 text-orange-600 animate-spin mx-auto mb-6" />
-            <p className="text-stone-600">Loading recipe...</p>
+function CookMode({ title, serves: servesParam, img }) {
+  const router = useRouter();
+  const k = useKitchen();
+  const { setCook, setCurrent, saveLeftover } = k;
+  const rootRef = useRef(null);
+  const [r, setR] = useState(null);
+  const [error, setError] = useState("");
+  const [started, setStarted] = useState(false);
+  const [servesSel, setServesSel] = useState(null);
+  const [step, setStep] = useState(0);
+  const [done, setDone] = useState(false);
+  const [timerLeft, setTimerLeft] = useState(null);
+  const [timerOn, setTimerOn] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const [heard, setHeard] = useState("");
+  const [voiceNote, setVoiceNote] = useState("");
+  const [portions, setPortions] = useState(1);
+  const [leftoverSaved, setLeftoverSaved] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const recRef = useRef(null), wakeRef = useRef(null), ivRef = useRef(null), prevStep = useRef(0);
+
+  // load
+  useEffect(() => {
+    const fd = new FormData();
+    fd.append("recipeName", title);
+    if (img) fd.append("imageUrl", img);
+    getOrGenerateRecipe(fd)
+      .then((res) => {
+        const rec = fromServd(res.recipe);
+        setR(rec);
+        if (!Object.keys(rec.subs).length && rec.ings.length)
+          suggestSubstitutions(rec.title, rec.ings.map((i) => i.name)).then((s) => {
+            const subs = {};
+            s.substitutions.forEach((x) => x?.original && x.alternatives?.length && (subs[x.original] = x.alternatives.slice(0, 3)));
+            setR((cur) => (cur ? { ...cur, subs } : cur));
+          });
+      })
+      .catch((e) => setError(e.message || "Failed to load recipe"));
+  }, [title, img]);
+
+  const serves = servesSel || servesParam || r?.baseServes || 2;
+  useEffect(() => {
+    if (!r) return;
+    setCurrent(r, serves);
+    setCook((c) => (c?.recipe?.key === r.key ? { ...c, recipe: r, serves } : { recipe: r, serves, checked: {}, swaps: {}, swapOpen: null }));
+  }, [r, serves, setCook, setCurrent]);
+  useEffect(() => () => setCook(null), [setCook]);
+
+  // timer
+  const resetTimer = useCallback(() => {
+    clearInterval(ivRef.current);
+    setTimerOn(false);
+    setTimerLeft(null);
+  }, []);
+  useEffect(() => () => clearInterval(ivRef.current), []);
+  const cur = r?.steps[step] || r?.steps[0];
+  const toggleTimer = useCallback(() => {
+    if (!cur?.timer) return;
+    if (timerOn) { clearInterval(ivRef.current); setTimerOn(false); return; }
+    if (timerLeft === 0) return;
+    setTimerOn(true);
+    setTimerLeft((t) => t ?? cur.timer * 60);
+    clearInterval(ivRef.current);
+    ivRef.current = setInterval(() => {
+      setTimerLeft((t) => {
+        if (t <= 1) {
+          clearInterval(ivRef.current);
+          setTimerOn(false);
+          try { navigator.vibrate?.([200, 100, 200]); } catch {}
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  }, [cur, timerOn, timerLeft]);
+
+  // navigation
+  const goStep = useCallback((n) => { resetTimer(); setStep(n); }, [resetTimer]);
+  const next = useCallback(() => {
+    if (!r) return;
+    if (!started) return setStarted(true);
+    if (done) return router.push("/dashboard");
+    if (step < r.steps.length - 1) goStep(step + 1);
+    else { resetTimer(); setDone(true); }
+  }, [r, started, done, step, goStep, resetTimer, router]);
+  const back = useCallback(() => { if (started && step > 0 && !done) goStep(step - 1); }, [started, step, done, goStep]);
+  const isLast = r && step === r.steps.length - 1;
+  const nextLabel = !started ? "Start cooking" : done ? "Back to discover" : isLast ? "Finish & plate" : "Next step";
+  useEffect(() => { setCook((c) => (c ? { ...c, next, nextLabel } : c)); }, [next, nextLabel, setCook]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (/INPUT|TEXTAREA/.test(e.target.tagName) || shareOpen) return;
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") back();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [next, back, shareOpen]);
+
+  // animations
+  useSpins(rootRef, [r?.key, started, done]);
+  useEffect(() => {
+    if (!r) return;
+    const root = rootRef.current;
+    if (!started) {
+      anim(root.querySelector("[data-plate]"), [{ transform: "rotate(-160deg) scale(.55)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 1100 });
+      stagger(root, "[data-fade]", UP(14), { duration: 600, delay: 200, step: 70 });
+      return;
+    }
+    if (done) {
+      anim(root.querySelector("[data-plate]"), [{ transform: "rotate(-160deg) scale(.5)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 1100 });
+      stagger(root, "[data-fade]", UP(16), { duration: 600, delay: 400, step: 90 });
+      return;
+    }
+    const dir = step >= prevStep.current ? 1 : -1;
+    prevStep.current = step;
+    anim(root.querySelector("[data-step]"), [{ opacity: 0, transform: `translateX(${dir * 56}px)` }, { opacity: 1, transform: "none" }], { duration: 600 });
+    anim(root.querySelector("[data-stepnum]"), [{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 700, delay: 60 });
+  }, [r, started, step, done]);
+
+  // hands-free: read aloud, keep screen awake, listen for commands
+  const speak = useCallback(() => {
+    if (!window.speechSynthesis || !r) return;
+    const s = r.steps[step];
+    try {
+      speechSynthesis.cancel();
+      speechSynthesis.speak(new SpeechSynthesisUtterance(done ? `All done. Enjoy your ${r.title}.` : `Step ${step + 1}. ${s.t}. ${s.d}`));
+    } catch {}
+  }, [r, step, done]);
+  const cmdRef = useRef({});
+  useEffect(() => {
+    cmdRef.current = { next, back, speak, toggleTimer };
+  }, [next, back, speak, toggleTimer]);
+  const stopHands = useCallback(() => {
+    const rec = recRef.current;
+    recRef.current = null;
+    try { rec?.stop(); } catch {}
+    try { wakeRef.current?.release?.(); } catch {}
+    wakeRef.current = null;
+    try { window.speechSynthesis?.cancel(); } catch {}
+    setHandsFree(false);
+    setHeard("");
+    setVoiceNote("");
+  }, []);
+  const startHands = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let note = "";
+    if (SR) {
+      try {
+        const rec = new SR();
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.lang = "en-US";
+        rec.onresult = (e) => {
+          const t = e.results[e.results.length - 1][0].transcript.toLowerCase().trim();
+          setHeard(t);
+          const c = cmdRef.current;
+          if (/next|continue|done|finish/.test(t)) c.next();
+          else if (/back|previous/.test(t)) c.back();
+          else if (/repeat|again|read/.test(t)) c.speak();
+          else if (/timer|start|pause|stop/.test(t)) c.toggleTimer();
+        };
+        rec.onend = () => { if (recRef.current === rec) { try { rec.start(); } catch {} } };
+        rec.onerror = (ev) => {
+          if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+            recRef.current = null;
+            setVoiceNote("Microphone blocked here — steps are still read aloud; use ← → keys or the buttons.");
+          }
+        };
+        rec.start();
+        recRef.current = rec;
+      } catch {
+        note = "Voice commands unavailable here — use ← → keys.";
+      }
+    } else note = "Voice commands aren't supported in this browser — use ← → keys. Read-aloud and screen-awake still work.";
+    navigator.wakeLock?.request("screen").then((l) => (wakeRef.current = l)).catch(() => {});
+    setVoiceNote(note);
+    setHeard("");
+    setHandsFree(true);
+  };
+  useEffect(() => () => stopHands(), [stopHands]);
+  useEffect(() => { if (handsFree) speak(); }, [handsFree, step, done]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ringRef = useRef(null), barRef = useRef(null);
+  useEffect(() => {
+    if (!handsFree) return;
+    if (ringRef.current && !motionOff()) ringRef.current.animate([{ transform: "scale(1)", opacity: 0.6 }, { transform: "scale(2)", opacity: 0 }], { duration: 1400, iterations: Infinity, easing: "ease-out" });
+    anim(barRef.current, [{ opacity: 0, transform: "translateY(-10px)" }, { opacity: 1, transform: "none" }], { duration: 500 });
+  }, [handsFree]);
+
+  const lsRef = useRef(null);
+  const onSaveLeftovers = async () => {
+    if (await saveLeftover({ title: r.title, portions, imageUrl: r.img, idea: r.left })) {
+      setLeftoverSaved(true);
+      requestAnimationFrame(() => anim(lsRef.current, [{ opacity: 0, transform: "scale(.8)" }, { opacity: 1, transform: "none" }], { duration: 500, easing: SPRING }));
+    }
+  };
+  const restart = () => {
+    resetTimer();
+    setStep(0);
+    prevStep.current = 0;
+    setDone(false);
+    setLeftoverSaved(false);
+    setPortions(1);
+    setCook((c) => (c ? { ...c, checked: {} } : c));
+  };
+
+  if (error)
+    return (
+      <div data-screen="1" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16, padding: "60px 10px" }}>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-.02em" }}>Couldn&apos;t load this recipe</div>
+        <p style={{ margin: 0, fontSize: 17, color: "#3A3A40", maxWidth: 420 }}>{error}</p>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="sv-btn-ghost" onClick={() => router.back()} style={{ height: 52, padding: "0 24px", fontSize: 16 }}>Go back</button>
+          <button className="sv-btn-dark" onClick={() => window.location.reload()} style={{ height: 52, padding: "0 24px", fontSize: 16 }}>Retry</button>
+        </div>
+      </div>
+    );
+  if (!r) return <Preparing title={title} />;
+
+  const left = timerLeft ?? (cur.timer ? cur.timer * 60 : 0);
+
+  // Ask first: confirm the dish and servings before step 1.
+  if (!started) {
+    const f = serves / (r.baseServes || serves);
+    const ings = r.ings.map((g) => ({ ...g, have: k.inPantry(g.name), listed: !k.inPantry(g.name) && k.inShop(g.name) }));
+    const missing = ings.filter((g) => !g.have && !g.listed);
+    return (
+      <div ref={rootRef} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 26 }}>
+        <div data-fade="1" className="sv-eyebrow" style={{ color: "#E11D24" }}>Before you start</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 40, alignItems: "flex-start" }}>
+          <div style={{ flex: "0 1 300px", minWidth: "min(220px, 100%)", aspectRatio: 1, position: "relative" }}>
+            <Plate src={r.img} alt={r.title} inset={20} rim={12} />
+          </div>
+          <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+            <h1 data-fade="1" style={{ margin: 0, fontSize: "clamp(32px, 6vw, 50px)", fontWeight: 700, letterSpacing: "-.04em", lineHeight: 1.04 }}>Cooking {r.title}?</h1>
+            {r.desc && <p data-fade="1" style={{ margin: 0, fontSize: 18, lineHeight: 1.5, color: "#3A3A40", maxWidth: 560 }}>{r.desc}</p>}
+            <div data-fade="1" style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 16, fontWeight: 600, color: "#3A3A40" }}>
+              <span>{fmtTime(r.time)}</span><span>{r.steps.length} steps</span><span>{r.cal != null ? `${r.cal} kcal / serving` : ""}</span>
+            </div>
+            <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="sv-eyebrow">How many are you cooking for?</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[1, 2, 4, 6].map((v) => (
+                  <button key={v} onClick={() => setServesSel(v)} style={{ height: 46, minWidth: 70, padding: "0 18px", borderRadius: 999, border: v === serves ? "1.5px solid #121212" : "1.5px dashed #C9C9D0", background: v === serves ? "#121212" : "transparent", color: v === serves ? "#fff" : "#121212", fontSize: 17, fontWeight: 600, transition: "all .3s cubic-bezier(.22,1,.36,1)" }}>{v} {v === 1 ? "person" : "ppl"}</button>
+                ))}
+              </div>
+            </div>
+            <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span className="sv-eyebrow">You&apos;ll need · <span style={{ color: "#121212" }}>{ings.filter((g) => g.have).length} of {ings.length} in your pantry</span></span>
+                {missing.length > 0 && <button className="sv-link-btn" onClick={() => k.addToShop(missing.map((g) => ({ name: g.name, quantity: scaleAmount(g.amount, f), forRecipe: r.title })))}>+ Add missing to list</button>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {ings.map((g) => (
+                  <span key={g.name} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px 7px 8px", borderRadius: 999, background: "#fff", border: `1.5px ${g.have ? "solid #121212" : "dashed #D2D2D8"}`, fontSize: 14, fontWeight: 600 }}>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: g.have ? "#121212" : g.listed ? "#EDEDF0" : "#E11D24", display: "grid", placeItems: "center" }}>{g.have ? <IconCheck size={10} /> : null}</span>
+                    {g.name}<span style={{ color: "#6A6A72", fontWeight: 500 }}>{scaleAmount(g.amount, f)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div data-fade="1" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6 }}>
+              <button className="sv-btn-dark" onClick={() => setStarted(true)} style={{ height: 60, padding: "0 10px 0 30px", fontSize: 18, gap: 18 }}>
+                Yes, start cooking
+                <span style={{ width: 44, height: 44, borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}><IconArrowRight /></span>
+              </button>
+              <Link href="/recipe" className="sv-btn-ghost" style={{ height: 60, padding: "0 26px", fontSize: 17 }}>Cook something else</Link>
+            </div>
           </div>
         </div>
-      }
-    >
-      <RecipeContent />
-    </Suspense>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={rootRef} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <button onClick={() => router.back()} title="Back" className="sv-btn-ghost" style={{ width: 50, height: 50, padding: 0, borderRadius: "50%" }}><IconArrowLeft /></button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="sv-eyebrow" style={{ color: "#E11D24" }}>Now cooking</div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-.02em" }}>{r.title}</div>
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "#6A6A72", fontVariantNumeric: "tabular-nums" }}>{done ? "All steps done" : `Step ${step + 1} of ${r.steps.length}`}</div>
+        <button
+          onClick={() => (handsFree ? stopHands() : startHands())}
+          aria-pressed={handsFree}
+          style={{ display: "flex", alignItems: "center", gap: 10, height: 50, padding: "0 20px 0 10px", borderRadius: 999, border: `1.5px ${handsFree ? "solid #E11D24" : "dashed #C9C9D0"}`, background: handsFree ? "#E11D24" : "#fff", color: handsFree ? "#fff" : "#121212", fontSize: 16, fontWeight: 700, transition: "all .35s cubic-bezier(.22,1,.36,1)" }}
+        >
+          <span style={{ position: "relative", width: 32, height: 32, borderRadius: "50%", background: handsFree ? "#fff" : "#121212", display: "grid", placeItems: "center" }}>
+            {handsFree && <span ref={ringRef} style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#fff" }} />}
+            <IconMic stroke={handsFree ? "#E11D24" : "#fff"} />
+          </span>
+          {handsFree ? "Hands-free on" : "Hands-free"}
+        </button>
+      </div>
+
+      {handsFree && (
+        <div ref={barRef} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "14px 18px", borderRadius: 20, background: "#fff", border: "1.5px dashed #D2D2D8", fontSize: 15 }}>
+          <b style={{ color: "#E11D24" }}>Listening</b>
+          <span style={{ color: "#3A3A40" }}>Say “next”, “back”, “repeat” or “start timer”. Steps are read aloud and the screen stays awake. ← → keys work too.</span>
+          {heard && <span style={{ marginLeft: "auto", background: "#121212", color: "#fff", borderRadius: 999, padding: "5px 12px", fontWeight: 700 }}>Heard: “{heard}”</span>}
+          {voiceNote && <span style={{ width: "100%", color: "#E11D24", fontWeight: 600 }}>{voiceNote}</span>}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 6 }}>
+        {r.steps.map((_, i) => {
+          const full = done || i < step;
+          return (
+            <div key={i} style={{ flex: 1, height: 6, borderRadius: 6, background: "#E3E3E8", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${full ? 100 : i === step ? 40 : 0}%`, background: full ? "#121212" : "#E11D24", borderRadius: 6, transition: "width .7s cubic-bezier(.22,1,.36,1), background .4s" }} />
+            </div>
+          );
+        })}
+      </div>
+
+      {!done ? (
+        <>
+          <div data-step="1" style={{ display: "flex", flexWrap: "wrap", gap: 44, alignItems: "center", minHeight: 380, padding: "10px 0" }}>
+            <div style={{ flex: "0 0 clamp(150px, 40vw, 240px)", aspectRatio: 1, position: "relative" }}>
+              <Plate src={r.img} inset={16} plateAttr={false} shadow="0 30px 60px -28px rgba(40,20,10,.45), inset 0 0 0 10px #F2F2F4" />
+            </div>
+            <div style={{ flex: "1 1 360px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ overflow: "hidden" }}>
+                <div data-stepnum="1" style={{ fontSize: "clamp(64px, 14vw, 112px)", lineHeight: 0.95, fontWeight: 800, letterSpacing: "-.05em", color: "transparent", WebkitTextStroke: "2px #121212" }}>{String(step + 1).padStart(2, "0")}</div>
+              </div>
+              <div style={{ fontSize: "clamp(26px, 5vw, 40px)", fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1.08 }}>{cur.t}</div>
+              <p style={{ margin: 0, fontSize: 20, lineHeight: 1.55, color: "#3A3A40", maxWidth: 620, textWrap: "pretty" }}>{cur.d}</p>
+              {cur.tip && (
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "16px 18px", borderRadius: 18, border: "1.5px dashed #D2D2D8", background: "#fff", maxWidth: 620 }}>
+                  <IconBulb />
+                  <div style={{ fontSize: 16, lineHeight: 1.5 }}><b>Chef&apos;s tip · </b>{cur.tip}</div>
+                </div>
+              )}
+              {cur.timer > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 14, alignSelf: "flex-start", background: "#fff", borderRadius: 999, padding: "6px 6px 6px 20px", boxShadow: "0 10px 26px -16px rgba(0,0,0,.3)" }}>
+                  <IconTimer />
+                  <span style={{ fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums", minWidth: 70 }}>{fmtClock(left)}</span>
+                  <button onClick={toggleTimer} style={{ height: 44, padding: "0 20px", border: 0, borderRadius: 999, background: timerOn ? "#E11D24" : "#121212", color: "#fff", fontSize: 15, fontWeight: 700, transition: "background .3s" }}>
+                    {timerOn ? "Pause" : timerLeft === 0 ? "Done" : timerLeft ? "Resume" : "Start"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <button onClick={back} className="sv-btn-ghost" style={{ height: 56, padding: "0 26px", fontSize: 17, opacity: step > 0 ? 1 : 0.4 }}><IconArrowLeft size={16} sw={2.4} />Previous</button>
+            <button onClick={next} className="sv-btn-dark" style={{ height: 56, padding: "0 10px 0 28px", fontSize: 17, gap: 18 }}>
+              {nextLabel}
+              <span style={{ width: 40, height: 40, borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}><IconArrowRight size={16} /></span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 18, padding: "30px 0 20px" }}>
+          <div style={{ width: 300, maxWidth: "80%", aspectRatio: 1, position: "relative" }}>
+            <Plate src={r.img} inset={20} rim={12} />
+          </div>
+          <h2 data-fade="1" style={{ margin: "10px 0 0", fontSize: "clamp(32px, 6vw, 48px)", fontWeight: 700, letterSpacing: "-.04em" }}>Plated. Enjoy.</h2>
+          <p data-fade="1" style={{ margin: 0, fontSize: 19, color: "#3A3A40", maxWidth: 440 }}>Your {r.title} is ready.</p>
+          <div data-fade="1" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "center", background: "#fff", borderRadius: 28, padding: "8px 8px 8px 22px", border: "1.5px dashed #D2D2D8", minHeight: 56, boxSizing: "border-box" }}>
+            {!leftoverSaved ? (
+              <>
+                <span style={{ fontSize: 16, fontWeight: 700 }}>Any leftovers?</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button onClick={() => setPortions((p) => Math.max(1, p - 1))} aria-label="Fewer portions" style={{ width: 34, height: 34, padding: 0, border: 0, borderRadius: "50%", background: "#EDEDF0", fontSize: 18, fontWeight: 700 }}>−</button>
+                  <span style={{ minWidth: 86, fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{portions} {portions === 1 ? "portion" : "portions"}</span>
+                  <button onClick={() => setPortions((p) => Math.min(6, p + 1))} aria-label="More portions" style={{ width: 34, height: 34, padding: 0, border: 0, borderRadius: "50%", background: "#EDEDF0", fontSize: 18, fontWeight: 700 }}>+</button>
+                </div>
+                <button className="sv-btn-dark" onClick={onSaveLeftovers} style={{ height: 42, padding: "0 18px", fontSize: 15, fontWeight: 700 }}>Save to pantry</button>
+              </>
+            ) : (
+              <span ref={lsRef} style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 14, fontSize: 16, fontWeight: 700 }}>
+                <span style={{ width: 28, height: 28, borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}><IconCheck /></span>
+                Leftovers saved. We&apos;ll suggest what to do with them on your dashboard.
+              </span>
+            )}
+          </div>
+          <div data-fade="1" style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+            <button className="sv-btn-ghost" onClick={() => setShareOpen(true)} style={{ height: 56, padding: "0 26px", fontSize: 17 }}>Share your plate</button>
+            <button className="sv-btn-ghost" onClick={restart} style={{ height: 56, padding: "0 26px", fontSize: 17 }}>Cook it again</button>
+            <Link href="/dashboard" className="sv-btn-dark" style={{ height: 56, padding: "0 28px", fontSize: 17 }}>Find something else</Link>
+          </div>
+        </div>
+      )}
+
+      {shareOpen && <ShareModal recipe={r} serves={serves} swaps={k.cook?.swaps || {}} onClose={() => setShareOpen(false)} />}
+    </div>
   );
 }

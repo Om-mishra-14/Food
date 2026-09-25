@@ -1,0 +1,40 @@
+{
+  "kind": "collectionType",
+  "collectionName": "meal_plan_entries",
+  "info": {
+    "singularName": "meal-plan-entry",
+    "pluralName": "meal-plan-entries",
+    "displayName": "Meal Plan Entry",
+    "description": "One recipe placed on a day + meal slot of a user's weekly planner"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "slot": {
+      "type": "string",
+      "required": true
+    },
+    "recipeKey": {
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "imageUrl": {
+      "type": "string"
+    },
+    "ingredients": {
+      "type": "json"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "meal_plan_entries"
+    }
+  }
+}

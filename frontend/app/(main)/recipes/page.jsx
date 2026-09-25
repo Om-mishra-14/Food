@@ -1,92 +1,102 @@
 "use client";
 
-import { useEffect } from "react";
-import { Bookmark, Loader2, ChefHat } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import useFetch from "@/hooks/use-fetch";
-import { getSavedRecipes } from "@/actions/recipe.actions";
-import RecipeCard from "@/components/RecipeCard";
+import { toast } from "sonner";
+import { getSavedRecipes, unsaveRecipeByTitle } from "@/actions/recipe.actions";
+import { useKitchen } from "@/components/servd/KitchenProvider";
+import { Img } from "@/components/servd/Plate";
+import { IconBookmark } from "@/components/servd/icons";
+import { fmtTime, fromServd, heroHref } from "@/lib/servd/recipe";
+import { slideOut, stagger, UP } from "@/lib/servd/motion";
 
 export default function SavedRecipesPage() {
-  const {
-    loading,
-    data: recipesData,
-    fn: fetchSavedRecipes,
-  } = useFetch(getSavedRecipes);
+  const { forgetSaved } = useKitchen();
+  const rootRef = useRef(null);
+  const [recipes, setRecipes] = useState(null);
 
   useEffect(() => {
-    fetchSavedRecipes();
+    getSavedRecipes()
+      .then((d) => setRecipes(d.recipes.map(fromServd)))
+      .catch((e) => {
+        toast.error(e.message || "Couldn't load your saved recipes");
+        setRecipes([]);
+      });
   }, []);
 
-  const recipes = recipesData?.recipes || [];
+  useEffect(() => {
+    if (recipes === null) return;
+    stagger(rootRef.current, "[data-fade]", UP(16), { duration: 650, step: 90 });
+    stagger(rootRef.current, "[data-card]", UP(22), { duration: 650, delay: 300, step: 70 });
+  }, [recipes === null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const unsave = (r, el) => {
+    slideOut(el, () => setRecipes((cur) => cur.filter((x) => x.key !== r.key)), [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(.92)" }]);
+    forgetSaved(r.title);
+    unsaveRecipeByTitle(r.title).catch((e) => {
+      toast.error(e.message || "Couldn't remove that recipe");
+      setRecipes((cur) => [r, ...cur]);
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-stone-50 pt-24 pb-16 px-4">
-      <div className="container mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="flex items-center gap-1 mb-8">
-          <Bookmark className="w-25 h-25 text-orange-600 " />
-          <div>
-            <h1 className="text-4xl md:text-6xl font-bold text-stone-900 tracking-tight leading-tight">
-              My Saved Recipes
-            </h1>
-            <p className="text-stone-600">
-              Your personal collection of favorite recipes
-            </p>
+    <div ref={rootRef} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+      <div data-fade="1" style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <span style={{ width: 72, height: 72, flex: "none", borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}>
+          <IconBookmark size={30} fill="#fff" stroke="#fff" sw={0} />
+        </span>
+        <div>
+          <h1 className="sv-h1" style={{ letterSpacing: "-.04em" }}>My Saved Recipes</h1>
+          <p className="sv-lead" style={{ marginTop: 4 }}>Your personal collection of favourite recipes</p>
+        </div>
+      </div>
+
+      {recipes === null && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))", gap: 16 }}>
+          {[0, 1].map((i) => <div key={i} className="sv-skel" style={{ height: 178, borderRadius: 26 }} />)}
+        </div>
+      )}
+
+      {recipes?.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))", gap: 16 }}>
+          {recipes.map((r) => (
+            <div key={r.key} data-card="1" className="sv-dash-card" style={{ position: "relative", display: "flex", gap: 20, padding: 14, borderRadius: 26 }}>
+              <Link href={heroHref(r)} style={{ width: "clamp(96px, 26vw, 150px)", height: "clamp(96px, 26vw, 150px)", flex: "none", borderRadius: 20, overflow: "hidden", background: "#E8D6C3" }}>
+                <Img src={r.img} alt={r.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </Link>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8, padding: "4px 36px 4px 0" }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ border: "1.5px solid #E11D24", color: "#E11D24", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>{r.cuisine}</span>
+                  <span style={{ border: "1.5px solid #D2D2D8", color: "#3A3A40", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>{r.cat}</span>
+                </div>
+                <Link href={heroHref(r)} style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.02em", color: "#121212", lineHeight: 1.15 }}>{r.title}</Link>
+                <div className="sv-clamp2" style={{ fontSize: 15, lineHeight: 1.45, color: "#3A3A40" }}>{r.desc}</div>
+                <div style={{ display: "flex", gap: 16, fontSize: 14, fontWeight: 600, color: "#6A6A72", marginTop: "auto" }}>
+                  <span>{fmtTime(r.time)}</span>
+                  <span>{r.cal != null ? `${r.cal} kcal` : `${r.ings.length} ingredients`}</span>
+                </div>
+              </div>
+              <button onClick={(e) => unsave(r, e.currentTarget.closest("[data-card]"))} title="Remove from collection" className="sv-unsave" style={{ position: "absolute", top: 14, right: 14, width: 36, height: 36, padding: 0, border: 0, borderRadius: "50%", background: "#fff", display: "grid", placeItems: "center", boxShadow: "0 4px 12px -6px rgba(0,0,0,.3)" }}>
+                <IconBookmark size={16} fill="#E11D24" stroke="#E11D24" sw={1.9} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {recipes?.length === 0 && (
+        <div data-fade="1" style={{ border: "1.5px dashed #D2D2D8", borderRadius: 30, padding: "60px 30px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <span style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "grid", placeItems: "center" }}>
+            <IconBookmark size={30} stroke="#E11D24" sw={1.9} />
+          </span>
+          <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-.02em" }}>No saved recipes yet</div>
+          <p style={{ margin: 0, fontSize: 17, color: "#3A3A40", maxWidth: 420 }}>Start exploring recipes and save your favourites to build your personal cookbook.</p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginTop: 6 }}>
+            <Link href="/dashboard" className="sv-btn-dark" style={{ height: 54, padding: "0 26px", fontSize: 16 }}>Explore Recipes</Link>
+            <Link href="/pantry" className="sv-btn-ghost" style={{ height: 54, padding: "0 26px", fontSize: 16 }}>Check Your Pantry</Link>
           </div>
         </div>
-
-        {/* Loading State */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-12 h-12 text-orange-600 animate-spin mb-6" />
-            <p className="text-stone-600">Loading your saved recipes...</p>
-          </div>
-        )}
-
-        {/* Recipes Grid */}
-        {!loading && recipes.length > 0 && (
-          <div className="grid md:grid-cols-2 gap-6">
-            {recipes.map((recipe) => (
-              <RecipeCard
-                key={recipe.documentId}
-                recipe={recipe}
-                variant="list"
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && recipes.length === 0 && (
-          <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-stone-200">
-            <div className="bg-orange-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Bookmark className="w-10 h-10 text-orange-600" />
-            </div>
-            <h3 className="text-2xl font-bold text-stone-900 mb-2">
-              No Saved Recipes Yet
-            </h3>
-            <p className="text-stone-600 mb-8 max-w-md mx-auto">
-              Start exploring recipes and save your favorites to build your
-              personal cookbook!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/dashboard">
-                <Button className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
-                  <ChefHat className="w-4 h-4" />
-                  Explore Recipes
-                </Button>
-              </Link>
-              <Link href="/pantry">
-                <Button variant="outline" className="border-stone-300 gap-2">
-                  Check Your Pantry
-                </Button>
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

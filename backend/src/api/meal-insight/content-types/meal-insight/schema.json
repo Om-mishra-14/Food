@@ -1,0 +1,25 @@
+{
+  "kind": "collectionType",
+  "collectionName": "meal_insights",
+  "info": {
+    "singularName": "meal-insight",
+    "pluralName": "meal-insights",
+    "displayName": "Meal Insight",
+    "description": "AI-estimated nutrition, diet tags and substitutions for a TheMealDB meal, cached so each meal is only analysed once"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "mealId": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "data": {
+      "type": "json",
+      "required": true
+    }
+  }
+}
