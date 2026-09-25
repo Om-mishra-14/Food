@@ -5,12 +5,24 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import KitchenProvider from "@/components/servd/KitchenProvider";
 import AppShell from "@/components/servd/AppShell";
+import PwaInstall from "@/components/servd/PwaInstall";
 
 const urbanist = Urbanist({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata = {
   title: "Servd - AI Recipes Platform",
   description: "Snap your fridge, find what to cook, and cook it step by step.",
+  applicationName: "Servd",
+  appleWebApp: { capable: true, title: "Servd", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 export const viewport = {
@@ -36,6 +48,7 @@ export default function RootLayout({ children }) {
         <body className={`sv-body ${urbanist.className}`}>
           <KitchenProvider>
             <AppShell>{children}</AppShell>
+            <PwaInstall />
           </KitchenProvider>
           <Toaster
             position="bottom-center"

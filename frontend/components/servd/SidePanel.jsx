@@ -5,7 +5,7 @@ import { useKitchen } from "./KitchenProvider";
 import { screenOf } from "./AppShell";
 import { Img } from "./Plate";
 import { IconCheck, IconPlus, IconSwap, IconX } from "./icons";
-import { cookHref, expLabel, fmtTime, ingImg, listHas, matchOf, scaleAmount } from "@/lib/servd/recipe";
+import { cookHref, expLabel, fmtTime, listHas, matchOf, scaleAmount } from "@/lib/servd/recipe";
 import { anim, openHeight, useTween } from "@/lib/servd/motion";
 
 export default function SidePanel() {
@@ -71,7 +71,7 @@ function PantryPanel({ screen }) {
             {k.pantry.map((p) => (
               <div key={p.id} data-pid={p.id} className="sv-row" style={{ opacity: p.pending ? 0.7 : 1 }}>
                 <div style={{ width: 56, height: 56, flex: "none", borderRadius: "50%", overflow: "hidden", background: "#fff", display: "grid", placeItems: "center", boxShadow: "0 6px 14px -8px rgba(0,0,0,.25)" }}>
-                  <Img src={p.isLeftover && p.imageUrl ? p.imageUrl : ingImg(p.name)} style={p.isLeftover ? { width: "100%", height: "100%", objectFit: "cover" } : { width: 42, height: 42, objectFit: "contain" }} />
+                  <Img {...(p.isLeftover && p.imageUrl ? { src: p.imageUrl } : { ingredient: p.name })} style={p.isLeftover ? { width: "100%", height: "100%", objectFit: "cover" } : { width: 42, height: 42, objectFit: "contain" }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 17, fontWeight: 600 }}>{p.name}</div>
@@ -128,7 +128,7 @@ function PantryPanel({ screen }) {
                   <IconCheck />
                 </button>
                 <div style={{ width: 46, height: 46, flex: "none", borderRadius: "50%", background: "#fff", display: "grid", placeItems: "center" }}>
-                  <Img src={ingImg(s.name)} style={{ width: 34, height: 34, objectFit: "contain" }} />
+                  <Img ingredient={s.name} style={{ width: 34, height: 34, objectFit: "contain" }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 600, textDecoration: s.done ? "line-through" : "none" }}>{s.name}</div>
@@ -208,7 +208,7 @@ function CookPanel() {
                 <button className="sv-check" data-on={ck ? "1" : "0"} title="Mark prepped" onClick={() => upd((c) => ({ checked: { ...c.checked, [g.name]: !c.checked[g.name] } }))}>
                   <IconCheck />
                 </button>
-                <Img src={ingImg(g.name)} style={{ width: 38, height: 38, objectFit: "contain" }} />
+                <Img ingredient={g.name} style={{ width: 38, height: 38, objectFit: "contain" }} />
                 <div onClick={() => upd((c) => ({ checked: { ...c.checked, [g.name]: !c.checked[g.name] } }))} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
                   <div style={{ fontSize: 16, fontWeight: 600, textDecoration: ck ? "line-through" : "none" }}>{sw || g.name}</div>
                   {sw && <div style={{ fontSize: 12, fontWeight: 700, color: "#E11D24" }}>swapped for {g.name}</div>}

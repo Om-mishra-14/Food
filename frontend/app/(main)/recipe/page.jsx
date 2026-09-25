@@ -6,10 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getOrGenerateRecipe } from "@/actions/recipe.actions";
 import { suggestSubstitutions } from "@/actions/kitchen.actions";
 import { useKitchen } from "@/components/servd/KitchenProvider";
-import Plate from "@/components/servd/Plate";
+import Plate, { Img } from "@/components/servd/Plate";
 import ShareModal from "@/components/servd/ShareModal";
 import { IconArrowLeft, IconArrowRight, IconBulb, IconCheck, IconChef, IconMic, IconSearch, IconTimer } from "@/components/servd/icons";
-import { cookHref, fmtClock, fmtTime, fromServd, scaleAmount } from "@/lib/servd/recipe";
+import { cookHref, fmtClock, fmtTime, fromServd, scaleAmount, thumb } from "@/lib/servd/recipe";
 import { anim, motionOff, SPRING, stagger, UP, useSpins } from "@/lib/servd/motion";
 
 export default function RecipePage() {
@@ -59,8 +59,7 @@ function HowToCook() {
       </form>
       {current?.recipe && (
         <Link data-fade="1" href={`${cookHref(current.recipe.title)}&serves=${current.serves}${current.recipe.source === "mealdb" ? `&img=${encodeURIComponent(current.recipe.img)}` : ""}`} className="sv-dash-card" style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, borderRadius: 24, color: "#121212" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={current.recipe.img} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", flex: "none", boxShadow: "0 0 0 4px #fff" }} />
+          <Img src={thumb(current.recipe.img)} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", flex: "none", boxShadow: "0 0 0 4px #fff" }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="sv-eyebrow" style={{ color: "#E11D24" }}>You were looking at</div>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{current.recipe.title}</div>
@@ -74,8 +73,7 @@ function HowToCook() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {seen.slice(0, 8).map((r) => (
               <Link key={r.key} href={cookHref(r.title)} className="sv-dash-card" style={{ display: "flex", alignItems: "center", gap: 10, height: 52, padding: "0 18px 0 5px", borderRadius: 999, fontSize: 15, fontWeight: 600, color: "#121212" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={r.img} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover" }} />
+                <Img src={thumb(r.img)} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover" }} />
                 {r.title}
               </Link>
             ))}

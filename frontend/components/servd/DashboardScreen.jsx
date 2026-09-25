@@ -8,7 +8,7 @@ import ShareModal from "./ShareModal";
 import { IconArrowLeft, IconArrowRight, IconBookmark, IconCheck, IconClock, IconFilter, IconFlame, IconList, IconLock, IconPeople, IconPlus, IconShare, IconSwap } from "./icons";
 import { getMealInsights, listMeals, lookupMeals } from "@/actions/meals.actions";
 import { getOrGenerateRecipe } from "@/actions/recipe.actions";
-import { blockReason, cookHref, DIETS, filterCount, fmtTime, fromMealDB, fromServd, heroHref, thumb, ingImg, matchOf, NO_FILTERS, passes, scaleAmount, soonUses, SPICE } from "@/lib/servd/recipe";
+import { blockReason, cookHref, DIETS, filterCount, fmtTime, fromMealDB, fromServd, heroHref, thumb, matchOf, NO_FILTERS, passes, scaleAmount, soonUses, SPICE } from "@/lib/servd/recipe";
 import { DASH_CUISINES, findArea } from "@/lib/servd/areas";
 import { anim, EASE, heroAnim, motionOff, openHeight, screenAnim, stagger, useSpins, useTween } from "@/lib/servd/motion";
 
@@ -284,7 +284,7 @@ export default function DashboardScreen({ categories, activeCat, heroMeal, cookT
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", paddingBottom: 12 }}>
                 {ings.map((g) => (
                   <div key={g.name} data-tile="1" data-fly="1" title={`${g.name} · ${g.amt}`} className="sv-tile">
-                    <Img src={ingImg(g.name)} />
+                    <Img ingredient={g.name} />
                     {g.have && <div className="sv-tile-badge" style={{ background: "#121212" }}><IconCheck /></div>}
                     {g.inShop && <div className="sv-tile-badge" title="On your shopping list" style={{ background: "#fff", border: "1.5px solid #121212" }}><IconList /></div>}
                     {g.missing && (
