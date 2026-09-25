@@ -36,7 +36,7 @@ function PantryPanel({ screen }) {
   const r = k.current?.recipe;
   const have = r ? r.ings.filter((i) => listHas(k.pantry, i.name)).length : 0;
   const match = useTween(r ? matchOf(r, k.pantry) : 0);
-  const shopText = encodeURIComponent("Servd shopping list:\n" + k.shop.map((x) => `• ${x.name}${x.quantity ? ` — ${x.quantity}` : ""}`).join("\n"));
+  const shopText = encodeURIComponent("Fridge2Fork shopping list:\n" + k.shop.map((x) => `• ${x.name}${x.quantity ? ` — ${x.quantity}` : ""}`).join("\n"));
 
   return (
     <div ref={panelRef} style={{ display: "contents" }}>

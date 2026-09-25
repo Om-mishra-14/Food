@@ -65,7 +65,7 @@ export default function ShareModal({ recipe: r, serves, swaps, onClose }) {
     setPdfBusy(true);
     try {
       const file = new File([await buildPdf()], fileName, { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: r.title, text: `${r.title} — cooked with Servd` });
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: r.title, text: `${r.title} — cooked with Fridge2Fork` });
       else await navigator.share({ title: r.title, text, url: link });
     } catch (e) {
       if (e?.name !== "AbortError") toast.error("Sharing isn't available here — try Download PDF.");
@@ -86,7 +86,7 @@ export default function ShareModal({ recipe: r, serves, swaps, onClose }) {
           <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{r.title}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#6A6A72" }}>{fmtTime(r.time)} · {serves} servings · {r.cal != null ? `${r.cal} kcal` : "Nutrition n/a"}</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#E11D24", marginTop: 4 }}>Cooked with SERVD</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#E11D24", marginTop: 4 }}>Cooked with Fridge2Fork</div>
           </div>
         </div>
         <a href={`https://wa.me/?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="sv-btn-dark" style={{ height: 58, fontSize: 17, fontWeight: 700 }}>Send on WhatsApp</a>

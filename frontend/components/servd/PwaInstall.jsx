@@ -1,5 +1,5 @@
 "use client";
-// Registers the service worker and offers to install Servd as an app:
+// Registers the service worker and offers to install Fridge2Fork as an app:
 // Chrome/Edge/Android get an "Install" button (beforeinstallprompt);
 // iPhone/iPad Safari get "Share → Add to Home Screen" instructions.
 import { useEffect, useRef, useState } from "react";
@@ -68,11 +68,11 @@ export default function PwaInstall() {
 
   if (!mode) return null;
   return (
-    <div ref={cardRef} className="sv-install" role="dialog" aria-label="Install Servd">
+    <div ref={cardRef} className="sv-install" role="dialog" aria-label="Install Fridge2Fork">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icons/icon-192.png" alt="" width={48} height={48} style={{ borderRadius: 14, flex: "none" }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 700 }}>Install Servd</div>
+        <div style={{ fontSize: 16, fontWeight: 700 }}>Install Fridge2Fork</div>
         <div style={{ fontSize: 14, color: "#B9B9C0", lineHeight: 1.35 }}>
           {mode === "ios" ? (
             <>Tap <b style={{ color: "#fff" }}>Share</b> <ShareGlyph /> then <b style={{ color: "#fff" }}>Add to Home Screen</b>.</>

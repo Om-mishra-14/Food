@@ -85,14 +85,24 @@ body.sv-body {
   justify-content: space-between;
 }
 .sv-logo {
+  display: flex; align-items: center; gap: 10px;
   border: 0; background: transparent; padding: 0;
-  font-weight: 800; font-size: 27px; letter-spacing: -0.04em;
-  color: var(--sv-red);
+  font-weight: 800; font-size: 28px; letter-spacing: -0.05em;
+  transition: transform 0.35s var(--sv-spring);
 }
+:where(.sv-body) a.sv-logo { color: var(--sv-ink); }
+.sv-logo:hover { transform: rotate(-3deg) scale(1.04); }
+.sv-logo-tile {
+  width: 42px; height: 42px; border-radius: 13px; flex: none;
+  background: var(--sv-red); display: grid; place-items: center;
+}
+.sv-logo-word { display: flex; white-space: pre; }
 .sv-header-right { display: flex; align-items: center; gap: 10px; }
+/* The wordmark leaves no room for all seven tabs beside it, so they get their own row. */
 .sv-nav {
   position: relative;
-  flex: 1 1 auto;
+  order: 3;
+  flex: 1 1 100%;
   display: flex;
   justify-content: center;
   gap: 6px;
@@ -314,11 +324,60 @@ body.sv-body {
 .sv-hide-compact { }
 .sv-only-compact { display: none; }
 
+/* ── load splash: red curtain, F2F mark draws itself, then it lifts ───── */
+.sv-splash {
+  position: fixed; inset: 0; z-index: 2000;
+  background: var(--sv-red);
+  display: grid; place-items: center; overflow: hidden;
+  animation: sv-sp-lift 0.8s cubic-bezier(0.76, 0, 0.24, 1) 2.6s forwards;
+}
+.sv-nosplash .sv-splash { display: none; }
+.sv-sp-ring {
+  position: absolute; width: min(120vw, 1100px); aspect-ratio: 1; border-radius: 50%;
+  border: 1.5px dashed rgba(255, 255, 255, 0.35);
+  animation: sv-sp-ring 2.2s var(--sv-ease) both;
+}
+.sv-sp-stack { position: relative; display: flex; flex-direction: column; align-items: center; gap: 26px; }
+.sv-sp-bob { animation: sv-sp-bob 1.4s ease-in-out 0.7s infinite; }
+.sv-sp-mark {
+  width: 132px; height: 132px; border-radius: 40px; background: #fff;
+  display: grid; place-items: center;
+  box-shadow: 0 30px 60px -24px rgba(80, 0, 0, 0.6);
+  animation: sv-sp-pop 0.7s var(--sv-spring) both;
+}
+.sv-sp-draw { stroke-dasharray: 1; animation: sv-sp-draw 0.76s cubic-bezier(0.65, 0, 0.35, 1) 0.56s both; }
+.sv-sp-tine { stroke-dasharray: 1; animation: sv-sp-draw 0.3s var(--sv-spring) 1.18s both; }
+.sv-sp-word {
+  display: flex; font-size: clamp(52px, 12vw, 76px); font-weight: 800; letter-spacing: -0.05em;
+  line-height: 1; overflow: hidden; padding: 0 0.06em 0.08em;
+}
+.sv-sp-word span { display: inline-block; white-space: pre; animation: sv-sp-letter 0.65s var(--sv-spring) both; }
+.sv-sp-tag {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  animation: sv-sp-tag 0.5s var(--sv-ease) 0.85s both;
+}
+.sv-sp-track { width: 160px; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.3); overflow: hidden; }
+.sv-sp-bar {
+  width: 100%; height: 100%; background: #fff; border-radius: 5px; transform-origin: left;
+  animation: sv-sp-bar 1.5s cubic-bezier(0.65, 0, 0.35, 1) 0.7s both;
+}
+@keyframes sv-sp-lift {
+  from { transform: translateY(0); border-radius: 0; }
+  to { transform: translateY(-105%); border-radius: 0 0 50% 50% / 0 0 18% 18%; }
+}
+@keyframes sv-sp-ring { from { transform: scale(0.2) rotate(0); opacity: 0; } to { transform: scale(1) rotate(90deg); opacity: 1; } }
+@keyframes sv-sp-pop { from { transform: scale(0) rotate(-24deg); } to { transform: scale(1) rotate(0); } }
+@keyframes sv-sp-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes sv-sp-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes sv-sp-letter { from { transform: translateY(110%) rotate(8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sv-sp-tag { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes sv-sp-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
 /* ── tablets & small laptops ───────────────────────────────────────────── */
 @media (max-width: 1179px) {
   .sv-root { padding: 22px 14px; }
   .sv-shell { padding: 14px; }
-  .sv-nav { order: 3; flex: 1 1 100%; gap: 4px; }
+  .sv-nav { gap: 4px; }
   .sv-tab { height: 46px; padding: 0 14px; font-size: 15px; gap: 8px; }
   .sv-aside { max-width: none; }
 }
@@ -330,6 +389,9 @@ body.sv-body {
   .sv-shell { border-radius: 26px; padding: 8px; gap: 10px; }
   .sv-body-row { gap: 10px; }
   .sv-header { padding: 10px 10px 10px 18px; }
+  .sv-logo { font-size: 23px; gap: 8px; }
+  .sv-logo-tile { width: 36px; height: 36px; border-radius: 11px; }
+  .sv-logo-tile svg { width: 24px; height: 24px; }
   .sv-nav {
     position: fixed; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
     z-index: 400; order: 0; flex: none;
@@ -355,6 +417,11 @@ body.sv-body {
   .sv-only-compact { display: revert; }
 }
 
+@media (max-width: 399px) {
+  .sv-logo .sv-logo-word { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-skel { animation: none; }
+  .sv-splash { display: none; }
 }

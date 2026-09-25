@@ -4,7 +4,7 @@ import { fmtTime, scaleAmount } from "@/lib/servd/recipe";
 const RED = "#E11D24";
 const styles = StyleSheet.create({
   page: { paddingTop: 40, paddingBottom: 56, paddingHorizontal: 44, fontSize: 11, fontFamily: "Helvetica", color: "#121212", lineHeight: 1.45 },
-  brand: { color: RED, fontSize: 16, fontFamily: "Helvetica-Bold", letterSpacing: 1, marginBottom: 14 },
+  brand: { color: RED, fontSize: 16, fontFamily: "Helvetica-Bold", marginBottom: 14 },
   photo: { width: "100%", height: 210, objectFit: "cover", borderRadius: 14, marginBottom: 16 },
   title: { fontSize: 26, fontFamily: "Helvetica-Bold", marginBottom: 6, lineHeight: 1.15 },
   desc: { fontSize: 11.5, color: "#3A3A40", marginBottom: 10 },
@@ -29,9 +29,9 @@ export function RecipePDF({ recipe, serves, swaps = {}, link = "" }) {
   const f = serves / (recipe.baseServes || serves);
   const meta = [fmtTime(recipe.time), `Serves ${serves}`, recipe.cal != null ? `${recipe.cal} kcal / serving` : null, `${recipe.steps.length} steps`].filter(Boolean);
   return (
-    <Document title={recipe.title} author="Servd">
+    <Document title={recipe.title} author="Fridge2Fork">
       <Page size="A4" style={styles.page}>
-        <Text style={styles.brand}>SERVD</Text>
+        <Text style={styles.brand}>fridge2fork</Text>
         {/* react-pdf Image has no alt attribute */}
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
         {/^https?:/.test(recipe.img || "") && <Image src={recipe.img} style={styles.photo} />}
@@ -74,9 +74,9 @@ export function RecipePDF({ recipe, serves, swaps = {}, link = "" }) {
         )}
 
         <View style={styles.footer} fixed>
-          <Text>Cooked with SERVD</Text>
+          <Text>Cooked with Fridge2Fork</Text>
           {link ? (
-            <Link src={link} style={{ color: "#9A9AA2" }}>Open this recipe in Servd</Link>
+            <Link src={link} style={{ color: "#9A9AA2" }}>Open this recipe in Fridge2Fork</Link>
           ) : (
             <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
           )}
