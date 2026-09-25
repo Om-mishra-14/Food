@@ -36,6 +36,7 @@ export default async function DashboardPage({ searchParams }) {
       activeCat={activeCat}
       heroMeal={heroMeal}
       cookTitle={sp.cook || null}
+      cookImg={sp.img || ""}
       fromExplore={sp.from === "explore"}
       isRecipeOfDay={!sp.meal && !sp.cook && !sp.cat}
       feedMeals={feed}

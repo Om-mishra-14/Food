@@ -2,17 +2,35 @@
 // TheMealDB lookups plus AI "insights" that fill the gaps the library leaves:
 // nutrition, diet tags, time, substitutions and a leftover idea. Insights are
 // cached in Strapi so each meal is analysed once for everyone.
+import { unstable_cache } from "next/cache";
 import { checkUser } from "@/lib/checkUser";
 import { strapi, askJson } from "@/lib/strapi";
 import { MEALDB_API, mealIngredients } from "@/lib/servd/recipe";
 
+// TheMealDB is a free API that sometimes times out or answers with an HTML
+// error page; retry a couple of times before giving up.
+async function mealdb(path, tries = 3) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(`${MEALDB_API}/${path}`, {
+        next: { revalidate: 86400 },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) throw new Error(`TheMealDB ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data.meals) ? data.meals : [];
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  console.error(`TheMealDB ${path} failed:`, lastErr);
+  throw new Error("Couldn't reach the recipe library");
+}
+
 export async function lookupMeal(id) {
-  const res = await fetch(`${MEALDB_API}/lookup.php?i=${encodeURIComponent(id)}`, {
-    next: { revalidate: 86400 },
-  });
-  if (!res.ok) throw new Error("Couldn't reach the recipe library");
-  const data = await res.json();
-  return data.meals?.[0] || null;
+  return (await mealdb(`lookup.php?i=${encodeURIComponent(id)}`))[0] || null;
 }
 
 export async function lookupMeals(ids) {
@@ -22,12 +40,64 @@ export async function lookupMeals(ids) {
 
 export async function listMeals(kind, value) {
   const q = kind === "area" ? "a" : "c";
-  const res = await fetch(`${MEALDB_API}/filter.php?${q}=${encodeURIComponent(value)}`, {
-    next: { revalidate: 86400 },
-  });
-  if (!res.ok) throw new Error("Couldn't reach the recipe library");
-  const data = await res.json();
-  return (data.meals || []).map((m) => ({ id: m.idMeal, title: m.strMeal, img: m.strMealThumb }));
+  const meals = await mealdb(`filter.php?${q}=${encodeURIComponent(value)}`);
+  return meals.map((m) => ({ id: m.idMeal, title: m.strMeal, img: m.strMealThumb, source: "mealdb" }));
+}
+
+async function unsplashImage(query) {
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key) return "";
+  try {
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=squarish`,
+      { headers: { Authorization: `Client-ID ${key}` }, next: { revalidate: 604800 } }
+    );
+    if (!res.ok) return "";
+    const data = await res.json();
+    return data.results?.[0]?.urls?.small || "";
+  } catch {
+    return "";
+  }
+}
+
+// Signature dishes suggested by AI for a cuisine, cached for a week.
+const aiCuisineDishes = unstable_cache(
+  async (area) => {
+    const list = await askJson(
+      "gpt-4.1-mini",
+      `List 24 authentic, popular ${area} dishes that people commonly cook at home, covering mains, breads/rice, snacks and desserts. Use the name the dish is best known by (e.g. "Butter Chicken", "Chole Bhature", "Masala Dosa"). Return ONLY a JSON array of strings, no markdown.`
+    );
+    const titles = (Array.isArray(list) ? list : []).map((t) => String(t).trim()).filter(Boolean).slice(0, 24);
+    const imgs = await Promise.all(titles.map((t) => unsplashImage(`${t} ${area} food`)));
+    return titles.map((title, i) => ({ id: "ai:" + title, title, img: imgs[i], source: "ai" }));
+  },
+  ["ai-cuisine-dishes-v1"],
+  { revalidate: 604800 }
+);
+
+// Dishes for the Explore tab: TheMealDB first, topped up with AI suggestions
+// when the library has only a handful (e.g. Indian) or can't be reached.
+export async function getCuisineDishes(area) {
+  const user = await checkUser();
+  let library = [], libraryError = null;
+  try {
+    library = await listMeals("area", area);
+  } catch (e) {
+    libraryError = e;
+  }
+  if (library.length >= 24 || !user) {
+    if (libraryError) throw libraryError;
+    return library;
+  }
+  let extra = [];
+  try {
+    extra = await aiCuisineDishes(area);
+  } catch (e) {
+    console.error("AI cuisine dishes failed:", e);
+    if (libraryError) throw libraryError;
+  }
+  const seen = new Set(library.map((m) => m.title.toLowerCase()));
+  return [...library, ...extra.filter((m) => !seen.has(m.title.toLowerCase()))];
 }
 
 const INSIGHT_SHAPE = `{

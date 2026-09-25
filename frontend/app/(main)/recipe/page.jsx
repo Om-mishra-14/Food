@@ -9,7 +9,7 @@ import { useKitchen } from "@/components/servd/KitchenProvider";
 import Plate from "@/components/servd/Plate";
 import ShareModal from "@/components/servd/ShareModal";
 import { IconArrowLeft, IconArrowRight, IconBulb, IconCheck, IconChef, IconMic, IconSearch, IconTimer } from "@/components/servd/icons";
-import { cookHref, fmtClock, fromServd } from "@/lib/servd/recipe";
+import { cookHref, fmtClock, fmtTime, fromServd, scaleAmount } from "@/lib/servd/recipe";
 import { anim, motionOff, SPRING, stagger, UP, useSpins } from "@/lib/servd/motion";
 
 export default function RecipePage() {
@@ -30,7 +30,7 @@ function RecipeContent() {
 // ── "How to cook?" — the old header modal, now its own screen ─────────────
 function HowToCook() {
   const router = useRouter();
-  const { seen } = useKitchen();
+  const { seen, current } = useKitchen();
   const [q, setQ] = useState("");
   const ref = useRef(null);
   useEffect(() => stagger(ref.current, "[data-fade]", UP(16), { duration: 650, step: 90 }), []);
@@ -43,7 +43,7 @@ function HowToCook() {
       <div data-fade="1" style={{ display: "flex", alignItems: "center", gap: 18 }}>
         <span style={{ width: 72, height: 72, flex: "none", borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center", color: "#fff" }}><IconChef size={32} stroke="#fff" /></span>
         <div>
-          <h1 className="sv-h1">How to cook?</h1>
+          <h1 className="sv-h1">What would you like to cook?</h1>
           <p className="sv-lead" style={{ marginTop: 4 }}>Name any dish and our AI chef will walk you through it, step by step.</p>
         </div>
       </div>
@@ -57,6 +57,17 @@ function HowToCook() {
           <span style={{ width: 42, height: 42, borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}><IconArrowRight /></span>
         </button>
       </form>
+      {current?.recipe && (
+        <Link data-fade="1" href={`${cookHref(current.recipe.title)}&serves=${current.serves}${current.recipe.source === "mealdb" ? `&img=${encodeURIComponent(current.recipe.img)}` : ""}`} className="sv-dash-card" style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, borderRadius: 24, color: "#121212" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={current.recipe.img} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", flex: "none", boxShadow: "0 0 0 4px #fff" }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sv-eyebrow" style={{ color: "#E11D24" }}>You were looking at</div>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{current.recipe.title}</div>
+          </div>
+          <span style={{ width: 40, height: 40, borderRadius: "50%", background: "#121212", display: "grid", placeItems: "center", flex: "none" }}><IconArrowRight size={16} /></span>
+        </Link>
+      )}
       {seen.length > 0 && (
         <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="sv-eyebrow">Recently viewed</div>
@@ -96,6 +107,8 @@ function CookMode({ title, serves: servesParam, img }) {
   const rootRef = useRef(null);
   const [r, setR] = useState(null);
   const [error, setError] = useState("");
+  const [started, setStarted] = useState(false);
+  const [servesSel, setServesSel] = useState(null);
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
   const [timerLeft, setTimerLeft] = useState(null);
@@ -127,7 +140,7 @@ function CookMode({ title, serves: servesParam, img }) {
       .catch((e) => setError(e.message || "Failed to load recipe"));
   }, [title, img]);
 
-  const serves = servesParam || r?.baseServes || 2;
+  const serves = servesSel || servesParam || r?.baseServes || 2;
   useEffect(() => {
     if (!r) return;
     setCurrent(r, serves);
@@ -167,13 +180,14 @@ function CookMode({ title, serves: servesParam, img }) {
   const goStep = useCallback((n) => { resetTimer(); setStep(n); }, [resetTimer]);
   const next = useCallback(() => {
     if (!r) return;
+    if (!started) return setStarted(true);
     if (done) return router.push("/dashboard");
     if (step < r.steps.length - 1) goStep(step + 1);
     else { resetTimer(); setDone(true); }
-  }, [r, done, step, goStep, resetTimer, router]);
-  const back = useCallback(() => { if (step > 0 && !done) goStep(step - 1); }, [step, done, goStep]);
+  }, [r, started, done, step, goStep, resetTimer, router]);
+  const back = useCallback(() => { if (started && step > 0 && !done) goStep(step - 1); }, [started, step, done, goStep]);
   const isLast = r && step === r.steps.length - 1;
-  const nextLabel = done ? "Back to discover" : isLast ? "Finish & plate" : "Next step";
+  const nextLabel = !started ? "Start cooking" : done ? "Back to discover" : isLast ? "Finish & plate" : "Next step";
   useEffect(() => { setCook((c) => (c ? { ...c, next, nextLabel } : c)); }, [next, nextLabel, setCook]);
 
   useEffect(() => {
@@ -187,10 +201,15 @@ function CookMode({ title, serves: servesParam, img }) {
   }, [next, back, shareOpen]);
 
   // animations
-  useSpins(rootRef, [r?.key, done]);
+  useSpins(rootRef, [r?.key, started, done]);
   useEffect(() => {
     if (!r) return;
     const root = rootRef.current;
+    if (!started) {
+      anim(root.querySelector("[data-plate]"), [{ transform: "rotate(-160deg) scale(.55)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 1100 });
+      stagger(root, "[data-fade]", UP(14), { duration: 600, delay: 200, step: 70 });
+      return;
+    }
     if (done) {
       anim(root.querySelector("[data-plate]"), [{ transform: "rotate(-160deg) scale(.5)", opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 1100 });
       stagger(root, "[data-fade]", UP(16), { duration: 600, delay: 400, step: 90 });
@@ -200,7 +219,7 @@ function CookMode({ title, serves: servesParam, img }) {
     prevStep.current = step;
     anim(root.querySelector("[data-step]"), [{ opacity: 0, transform: `translateX(${dir * 56}px)` }, { opacity: 1, transform: "none" }], { duration: 600 });
     anim(root.querySelector("[data-stepnum]"), [{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 700, delay: 60 });
-  }, [r, step, done]);
+  }, [r, started, step, done]);
 
   // hands-free: read aloud, keep screen awake, listen for commands
   const speak = useCallback(() => {
@@ -302,6 +321,59 @@ function CookMode({ title, serves: servesParam, img }) {
   if (!r) return <Preparing title={title} />;
 
   const left = timerLeft ?? (cur.timer ? cur.timer * 60 : 0);
+
+  // Ask first: confirm the dish and servings before step 1.
+  if (!started) {
+    const f = serves / (r.baseServes || serves);
+    const ings = r.ings.map((g) => ({ ...g, have: k.inPantry(g.name), listed: !k.inPantry(g.name) && k.inShop(g.name) }));
+    const missing = ings.filter((g) => !g.have && !g.listed);
+    return (
+      <div ref={rootRef} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 26 }}>
+        <div data-fade="1" className="sv-eyebrow" style={{ color: "#E11D24" }}>Before you start</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 40, alignItems: "flex-start" }}>
+          <div style={{ flex: "0 1 300px", minWidth: "min(220px, 100%)", aspectRatio: 1, position: "relative" }}>
+            <Plate src={r.img} alt={r.title} inset={20} rim={12} />
+          </div>
+          <div style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+            <h1 data-fade="1" style={{ margin: 0, fontSize: "clamp(32px, 6vw, 50px)", fontWeight: 700, letterSpacing: "-.04em", lineHeight: 1.04 }}>Cooking {r.title}?</h1>
+            {r.desc && <p data-fade="1" style={{ margin: 0, fontSize: 18, lineHeight: 1.5, color: "#3A3A40", maxWidth: 560 }}>{r.desc}</p>}
+            <div data-fade="1" style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 16, fontWeight: 600, color: "#3A3A40" }}>
+              <span>{fmtTime(r.time)}</span><span>{r.steps.length} steps</span><span>{r.cal != null ? `${r.cal} kcal / serving` : ""}</span>
+            </div>
+            <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="sv-eyebrow">How many are you cooking for?</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[1, 2, 4, 6].map((v) => (
+                  <button key={v} onClick={() => setServesSel(v)} style={{ height: 46, minWidth: 70, padding: "0 18px", borderRadius: 999, border: v === serves ? "1.5px solid #121212" : "1.5px dashed #C9C9D0", background: v === serves ? "#121212" : "transparent", color: v === serves ? "#fff" : "#121212", fontSize: 17, fontWeight: 600, transition: "all .3s cubic-bezier(.22,1,.36,1)" }}>{v} {v === 1 ? "person" : "ppl"}</button>
+                ))}
+              </div>
+            </div>
+            <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span className="sv-eyebrow">You&apos;ll need · <span style={{ color: "#121212" }}>{ings.filter((g) => g.have).length} of {ings.length} in your pantry</span></span>
+                {missing.length > 0 && <button className="sv-link-btn" onClick={() => k.addToShop(missing.map((g) => ({ name: g.name, quantity: scaleAmount(g.amount, f), forRecipe: r.title })))}>+ Add missing to list</button>}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {ings.map((g) => (
+                  <span key={g.name} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px 7px 8px", borderRadius: 999, background: "#fff", border: `1.5px ${g.have ? "solid #121212" : "dashed #D2D2D8"}`, fontSize: 14, fontWeight: 600 }}>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%", background: g.have ? "#121212" : g.listed ? "#EDEDF0" : "#E11D24", display: "grid", placeItems: "center" }}>{g.have ? <IconCheck size={10} /> : null}</span>
+                    {g.name}<span style={{ color: "#6A6A72", fontWeight: 500 }}>{scaleAmount(g.amount, f)}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div data-fade="1" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 6 }}>
+              <button className="sv-btn-dark" onClick={() => setStarted(true)} style={{ height: 60, padding: "0 10px 0 30px", fontSize: 18, gap: 18 }}>
+                Yes, start cooking
+                <span style={{ width: 44, height: 44, borderRadius: "50%", background: "#E11D24", display: "grid", placeItems: "center" }}><IconArrowRight /></span>
+              </button>
+              <Link href="/recipe" className="sv-btn-ghost" style={{ height: 60, padding: "0 26px", fontSize: 17 }}>Cook something else</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={rootRef} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 24 }}>

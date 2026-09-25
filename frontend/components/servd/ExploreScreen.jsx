@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Img } from "./Plate";
 import { IconArrowRight, IconSearch } from "./icons";
-import { listMeals } from "@/actions/meals.actions";
+import { getCuisineDishes } from "@/actions/meals.actions";
 import { AREAS, REGIONS } from "@/lib/servd/areas";
 import { anim, stagger, UP } from "@/lib/servd/motion";
 
@@ -28,7 +28,7 @@ export default function ExploreScreen({ initialArea }) {
     const cur = statusRef.current[a];
     if (!force && (cur === "done" || cur === "loading")) return;
     setAreaStatus(a, "loading");
-    listMeals("area", a)
+    getCuisineDishes(a)
       .then((list) => {
         setMeals((m) => ({ ...m, [a]: list }));
         setAreaStatus(a, "done");
@@ -81,7 +81,13 @@ export default function ExploreScreen({ initialArea }) {
   };
   const open = (m) => {
     setOpening(m.id);
-    startTransition(() => router.push(`/dashboard?meal=${m.id}&from=explore`));
+    startTransition(() =>
+      router.push(
+        m.source === "ai"
+          ? `/dashboard?cook=${encodeURIComponent(m.title)}&from=explore${m.img ? `&img=${encodeURIComponent(m.img)}` : ""}`
+          : `/dashboard?meal=${m.id}&from=explore`
+      )
+    );
   };
 
   return (
@@ -158,6 +164,7 @@ export default function ExploreScreen({ initialArea }) {
               <button key={m.id} data-excard="1" onClick={() => open(m)} className="sv-dash-card sv-excard" style={{ position: "relative", display: "flex", flexDirection: "column", gap: 10, padding: "10px 10px 14px", borderRadius: 24 }}>
                 <div style={{ position: "relative", aspectRatio: 1, borderRadius: 18, overflow: "hidden", background: "#E8D6C3" }}>
                   <Img src={m.img} alt={m.title} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  {m.source === "ai" && <span style={{ position: "absolute", left: 10, top: 10, background: "#E11D24", color: "#fff", borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 800 }}>AI pick</span>}
                   {pending && opening === m.id && <div style={{ position: "absolute", inset: 0, background: "rgba(18,18,18,.55)", display: "grid", placeItems: "center", color: "#fff", fontSize: 15, fontWeight: 700 }}>Opening…</div>}
                 </div>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "0 4px" }}>

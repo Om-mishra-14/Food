@@ -263,13 +263,36 @@ export function heroHref(r) {
 }
 export const cookHref = (title) => `/recipe?cook=${encodeURIComponent(title)}`;
 
-export function recipeText(r, serves, swaps = {}) {
+// Shareable recipe text. `rich` adds WhatsApp formatting (*bold*, _italic_);
+// `link` appends a link back to the recipe in Servd.
+export function recipeText(r, serves, swaps = {}, { rich = false, link = "" } = {}) {
+  const b = (t) => (rich ? `*${t}*` : t);
+  const i = (t) => (rich ? `_${t}_` : t);
   const f = serves / (r.baseServes || serves);
-  return (
-    `${r.title} — ${fmtTime(r.time)}, serves ${serves}\n\nIngredients:\n` +
-    r.ings.map((i) => `• ${scaleAmount(i.amount, f)} ${swaps[i.name] || i.name}`).join("\n") +
-    "\n\nMethod:\n" +
-    r.steps.map((s, i) => `${i + 1}. ${s.t} — ${s.d}`).join("\n") +
-    "\n\nCooked with Servd"
-  );
+  const meta = [`${fmtTime(r.time)}`, `Serves ${serves}`, r.cal != null ? `${r.cal} kcal / serving` : null].filter(Boolean).join("  ·  ");
+  const ing = r.ings.map((g) => {
+    const amt = scaleAmount(g.amount, f);
+    const name = swaps[g.name] ? `${swaps[g.name]} (instead of ${g.name})` : g.name;
+    return amt && amt !== "to taste" ? `   •  ${amt}  ${name}` : `   •  ${name}${amt ? ` (${amt})` : ""}`;
+  });
+  const steps = r.steps.map((s, n) => `${b(`${n + 1}. ${s.t}`)}\n     ${s.d}${s.tip ? `\n     ${i(`Tip: ${s.tip}`)}` : ""}`);
+  const tips = (r.tips || []).map((t) => `   •  ${t}`);
+  return [
+    b(r.title.toUpperCase()),
+    r.desc ? i(r.desc) : null,
+    "",
+    meta,
+    "",
+    b("INGREDIENTS"),
+    ...ing,
+    "",
+    b("METHOD"),
+    steps.join("\n\n"),
+    ...(tips.length ? ["", b("CHEF'S TIPS"), ...tips] : []),
+    "",
+    link ? `Open in Servd: ${link}` : null,
+    "— Cooked with SERVD",
+  ]
+    .filter((x) => x !== null)
+    .join("\n");
 }

@@ -12,7 +12,7 @@ import { blockReason, cookHref, DIETS, filterCount, fmtTime, fromMealDB, fromSer
 import { DASH_CUISINES, findArea } from "@/lib/servd/areas";
 import { anim, EASE, heroAnim, motionOff, openHeight, screenAnim, stagger, useSpins, useTween } from "@/lib/servd/motion";
 
-export default function DashboardScreen({ categories, activeCat, heroMeal, cookTitle, fromExplore, isRecipeOfDay, feedMeals }) {
+export default function DashboardScreen({ categories, activeCat, heroMeal, cookTitle, cookImg, fromExplore, isRecipeOfDay, feedMeals }) {
   const k = useKitchen();
   const router = useRouter();
   const rootRef = useRef(null), catRef = useRef(null), saveRef = useRef(null), drawerRef = useRef(null);
@@ -35,10 +35,11 @@ export default function DashboardScreen({ categories, activeCat, heroMeal, cookT
     if (!cookTitle) return;
     const fd = new FormData();
     fd.append("recipeName", cookTitle);
+    if (cookImg) fd.append("imageUrl", cookImg);
     getOrGenerateRecipe(fd)
       .then((r) => setServd(fromServd(r.recipe)))
       .catch(() => setServdError(true));
-  }, [cookTitle]);
+  }, [cookTitle, cookImg]);
 
   const r = useMemo(() => {
     if (cookTitle) return servd;
