@@ -1,9 +1,9 @@
-// Web app manifest: lets people install Servd on their phone's home screen.
+// Web app manifest: lets people install Fridge2Fork on their phone's home screen.
 export default function manifest() {
   return {
     id: "/",
-    name: "Servd — AI Cooking Assistant",
-    short_name: "Servd",
+    name: "Fridge2Fork — AI Cooking Assistant",
+    short_name: "Fridge2Fork",
     description: "Snap your fridge, find what to cook, and cook it step by step.",
     start_url: "/dashboard?source=pwa",
     scope: "/",

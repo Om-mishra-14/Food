@@ -1,6 +1,6 @@
 // Servd service worker: makes the app installable, loads fast on repeat
 // visits and shows a friendly page when offline.
-const VERSION = "servd-v1";
+const VERSION = "servd-v2";
 const STATIC = `${VERSION}-static`;
 const PAGES = `${VERSION}-pages`;
 const IMAGES = `${VERSION}-images`;

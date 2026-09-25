@@ -5,7 +5,7 @@ import { useKitchen } from "./KitchenProvider";
 import Plate from "./Plate";
 import { scrollToPricing } from "./AppShell";
 import { IconArrowRight, IconCamera, IconChef, IconCheck, IconCookbook, IconFlame, IconPlus, IconSearch, IconSparkle, IconStar, IconX } from "./icons";
-import { anim, heroAnim, openHeight, useReveal, useSpins } from "@/lib/servd/motion";
+import { afterSplash, anim, heroAnim, openHeight, useReveal, useSpins } from "@/lib/servd/motion";
 import useProUpgrade from "@/hooks/use-pro-upgrade";
 
 const STATS = [["10/mo", "Free Scans"], ["1M+", "Recipes Generated"], ["₹0", "Cost to Start"], ["4.9", "App Store Rating"]];
@@ -47,8 +47,10 @@ export default function HomeScreen() {
   useSpins(ref);
   useReveal(ref);
   useEffect(() => {
-    heroAnim(ref.current);
+    // On first load the hero waits for the splash curtain to start lifting.
+    const off = afterSplash(() => heroAnim(ref.current));
     if (window.location.hash === "#pricing") setTimeout(scrollToPricing, 150);
+    return off;
   }, []);
   useEffect(() => {
     if (firstBill.current) { firstBill.current = false; return; }

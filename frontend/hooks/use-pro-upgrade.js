@@ -60,7 +60,7 @@ export default function useProUpgrade({ onUpgraded } = {}) {
         key: keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: orderAmount,
         currency,
-        name: "Servd · Pro Chef",
+        name: "Fridge2Fork · Pro Chef",
         description: `Pro Plan · ${billingCycle === "yearly" ? "Yearly" : "Monthly"}`,
         order_id: orderId,
         prefill: { name: user.fullName || "", email: user.primaryEmailAddress?.emailAddress || "" },

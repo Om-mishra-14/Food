@@ -6,14 +6,15 @@ import { Toaster } from "@/components/ui/sonner";
 import KitchenProvider from "@/components/servd/KitchenProvider";
 import AppShell from "@/components/servd/AppShell";
 import PwaInstall from "@/components/servd/PwaInstall";
+import { SPLASH_GATE } from "@/components/servd/Brand";
 
 const urbanist = Urbanist({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata = {
-  title: "Servd - AI Recipes Platform",
+  title: "Fridge2Fork - AI Recipes Platform",
   description: "Snap your fridge, find what to cook, and cook it step by step.",
-  applicationName: "Servd",
-  appleWebApp: { capable: true, title: "Servd", statusBarStyle: "black-translucent" },
+  applicationName: "Fridge2Fork",
+  appleWebApp: { capable: true, title: "Fridge2Fork", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
   icons: {
     icon: [
@@ -45,6 +46,9 @@ export default function RootLayout({ children }) {
       }}
     >
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE }} />
+        </head>
         <body className={`sv-body ${urbanist.className}`}>
           <KitchenProvider>
             <AppShell>{children}</AppShell>

@@ -27,6 +27,21 @@ export function stagger(root, sel, keyframes, { duration = 600, delay = 0, step 
   qa(root, sel).forEach((el, i) => anim(el, keyframes, { duration, delay: delay + Math.min(i, max) * step, easing }));
 }
 
+// Fired once the load splash starts lifting (or right away when there is none).
+export const SPLASH_DONE = "sv:splash-done";
+
+// Run fn once the splash is out of the way. Returns a cleanup.
+export function afterSplash(fn) {
+  if (typeof window === "undefined") return () => {};
+  const el = document.querySelector(".sv-splash");
+  if (window.__svSplashDone || !el || getComputedStyle(el).display === "none") {
+    fn();
+    return () => {};
+  }
+  window.addEventListener(SPLASH_DONE, fn, { once: true });
+  return () => window.removeEventListener(SPLASH_DONE, fn);
+}
+
 export const UP = (px = 16) => [{ opacity: 0, transform: `translateY(${px}px)` }, { opacity: 1, transform: "none" }];
 
 // Plate spins in, chips pop, title words rise, the rest fades up.
@@ -92,23 +107,27 @@ export function useReveal(rootRef, deps = []) {
     if (!root || motionOff() || typeof IntersectionObserver === "undefined") return;
     const els = qa(root, "[data-reveal]");
     els.forEach((el) => (el.style.opacity = "0"));
-    const io = new IntersectionObserver(
-      (ents) =>
-        ents.forEach((en) => {
-          if (!en.isIntersecting) return;
-          const el = en.target;
-          io.unobserve(el);
-          el.style.opacity = "";
-          el.animate(UP(40), { duration: 900, easing: EASE, fill: "backwards" });
-          qa(el, "[data-rchild]").forEach((c, i) =>
-            c.animate(UP(26), { duration: 750, delay: 150 + i * 90, easing: EASE, fill: "backwards" })
-          );
-        }),
-      { threshold: 0.12 }
-    );
-    els.forEach((el) => io.observe(el));
-    const safety = setTimeout(() => els.forEach((el) => { if (el.style.opacity === "0" && el.getBoundingClientRect().top < innerHeight) el.style.opacity = ""; }), 2500);
-    return () => { io.disconnect(); clearTimeout(safety); els.forEach((el) => (el.style.opacity = "")); };
+    let io, safety;
+    // Wait for the load splash so sections already in view animate where people can see them.
+    const offSplash = afterSplash(() => {
+      io = new IntersectionObserver(
+        (ents) =>
+          ents.forEach((en) => {
+            if (!en.isIntersecting) return;
+            const el = en.target;
+            io.unobserve(el);
+            el.style.opacity = "";
+            el.animate(UP(40), { duration: 900, easing: EASE, fill: "backwards" });
+            qa(el, "[data-rchild]").forEach((c, i) =>
+              c.animate(UP(26), { duration: 750, delay: 150 + i * 90, easing: EASE, fill: "backwards" })
+            );
+          }),
+        { threshold: 0.12 }
+      );
+      els.forEach((el) => io.observe(el));
+      safety = setTimeout(() => els.forEach((el) => { if (el.style.opacity === "0" && el.getBoundingClientRect().top < innerHeight) el.style.opacity = ""; }), 2500);
+    });
+    return () => { offSplash(); io?.disconnect(); clearTimeout(safety); els.forEach((el) => (el.style.opacity = "")); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

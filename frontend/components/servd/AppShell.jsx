@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { useKitchen } from "./KitchenProvider";
+import { BRAND, LogoMark, Splash, Wordmark } from "./Brand";
 import { IconBookmark, IconBox, IconCalendar, IconCheck, IconChef, IconCompass, IconGlobe, IconHome, IconSparkle } from "./icons";
 import { anim, EASE, motionOff, UP } from "@/lib/servd/motion";
 
@@ -72,9 +73,13 @@ export default function AppShell({ children }) {
 
   return (
     <div className="sv-root">
+      <Splash />
       <div className="sv-shell">
         <header className="sv-header">
-          <Link href="/" className="sv-logo" aria-label="Servd home">SERVD</Link>
+          <Link href="/" className="sv-logo" aria-label={`${BRAND} home`}>
+            <span className="sv-logo-tile"><LogoMark size={28} /></span>
+            <Wordmark />
+          </Link>
           <nav ref={navRef} className="sv-nav" aria-label="Main">
             <div className="sv-nav-ind" style={{ left: ind?.left || 0, top: ind?.top || 0, width: ind?.w || 0, height: ind?.h || 0, opacity: ind ? 1 : 0, transition: t }} />
             {TABS.map(({ k, href, long, short, Icon }) => (

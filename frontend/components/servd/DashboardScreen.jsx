@@ -125,7 +125,7 @@ export default function DashboardScreen({ categories, activeCat, heroMeal, cookT
   return (
     <div ref={rootRef} data-screen="1" style={{ display: "flex", flexDirection: "column", gap: 30 }}>
       <div data-fade="1" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <h1 className="sv-h1">Fresh recipes, Servd daily</h1>
+        <h1 className="sv-h1">Fresh recipes, served daily</h1>
         <p className="sv-lead">Discover thousands of recipes from around the world. Cook, create, and savor.</p>
       </div>
 
