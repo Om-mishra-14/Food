@@ -26,6 +26,16 @@
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user",
       "inversedBy": "pantry_items"
+    },
+    "expiresAt": {
+      "type": "date"
+    },
+    "isLeftover": {
+      "type": "boolean",
+      "default": false
+    },
+    "leftoverIdea": {
+      "type": "text"
     }
   }
 }

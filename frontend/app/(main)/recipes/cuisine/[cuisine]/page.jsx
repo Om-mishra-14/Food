@@ -1,19 +1,8 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { getMealsByArea } from "@/actions/mealdb.actions";
-import RecipeGrid from "@/components/RecipeGrid";
-import { useParams } from "next/navigation";
-
-export default function CuisineRecipepage(){
-    const params = useParams();
-    const cuisine = params.cuisine;
-
-    return(
-        <RecipeGrid
-            type = "cuisine"
-            value = {cuisine}
-            fetchAction = {getMealsByArea}
-            backLink="/dashboard"       
-        />
-    );
+// Old cuisine grid → the Explore tab.
+export default async function CuisineRecipesPage({ params }) {
+  const { cuisine } = await params;
+  const name = decodeURIComponent(cuisine).replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  redirect(`/explore?area=${encodeURIComponent(name)}`);
 }

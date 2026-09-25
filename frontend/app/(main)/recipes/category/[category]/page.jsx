@@ -1,19 +1,8 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { getMealsByCategory } from "@/actions/mealdb.actions";
-import RecipeGrid from "@/components/RecipeGrid";
-import { useParams } from "next/navigation";
-
-export default function CategoryRecipepage(){
-    const params = useParams();
-    const category = params.category;
-
-    return(
-        <RecipeGrid
-            type = "category"
-            value = {category}
-            fetchAction = {getMealsByCategory}
-            backLink="/dashboard"       
-        />
-    );
+// Old category grid → the dashboard's category pills.
+export default async function CategoryRecipesPage({ params }) {
+  const { category } = await params;
+  const name = decodeURIComponent(category).replace(/\b\w/g, (c) => c.toUpperCase());
+  redirect(`/dashboard?cat=${encodeURIComponent(name)}`);
 }

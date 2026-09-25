@@ -104,6 +104,21 @@
       "relation": "oneToMany",
       "target": "api::recipe.recipe",
       "mappedBy": "users_permissions_user"
+    },
+    "shopping_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::shopping-item.shopping-item",
+      "mappedBy": "owner"
+    },
+    "meal_plan_entries": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::meal-plan-entry.meal-plan-entry",
+      "mappedBy": "owner"
+    },
+    "preferences": {
+      "type": "json"
     }
   }
 }

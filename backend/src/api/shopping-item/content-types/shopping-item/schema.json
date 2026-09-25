@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "shopping_items",
+  "info": {
+    "singularName": "shopping-item",
+    "pluralName": "shopping-items",
+    "displayName": "Shopping Item"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "quantity": {
+      "type": "string"
+    },
+    "forRecipe": {
+      "type": "string"
+    },
+    "done": {
+      "type": "boolean",
+      "default": false
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "shopping_items"
+    }
+  }
+}

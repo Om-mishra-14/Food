@@ -1,52 +1,74 @@
 "use server";
 import { checkUser } from "@/lib/checkUser";
-import OpenAI from "openai";
+import { strapi, ownedDoc, askJson, addDays } from "@/lib/strapi";
 
-const STRAPI_URL =
-  process.env.NEXT_PUBLIC_STRAPI_URL || "https://food-backend-e25g.onrender.com";
-const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const toItem = (d) => ({
+  id: d.documentId,
+  name: d.name,
+  quantity: d.quantity || "",
+  expiresAt: d.expiresAt || null,
+  isLeftover: !!d.isLeftover,
+  leftoverIdea: d.leftoverIdea || "",
+  imageUrl: d.imageUrl || "",
+  createdAt: d.createdAt,
+});
 
-const client = new OpenAI();
+async function requireUser() {
+  const user = await checkUser();
+  if (!user) throw new Error("User not authenticated");
+  return user;
+}
 
-// const response = await client.responses.create({
-//   model: "gpt-4.1-nano",
-//   input: "Write a one-sentence bedtime story about a unicorn.",
-// });
+// Ask the model how many days each ingredient keeps in a home kitchen.
+async function estimateShelfLife(names) {
+  if (!names.length) return {};
+  try {
+    const out = await askJson(
+      "gpt-4.1-nano",
+      `For each food ingredient below, estimate how many days it stays good in a typical home kitchen once bought (fridge for perishables, cupboard for dry goods). Return ONLY a JSON object mapping the exact ingredient name to a whole number of days (1-365), no markdown.\n\nIngredients:\n${names.map((n) => `- ${n}`).join("\n")}`
+    );
+    return out && typeof out === "object" ? out : {};
+  } catch (e) {
+    console.error("Shelf-life estimate failed:", e);
+    return {};
+  }
+}
 
-// console.log(response.output_text);
+async function createItems(user, items) {
+  const created = [];
+  for (const it of items) {
+    const data = await strapi("pantry-items", {
+      method: "POST",
+      body: {
+        data: {
+          name: it.name.trim(),
+          quantity: (it.quantity || "").trim(),
+          imageUrl: it.imageUrl || "",
+          expiresAt: it.expiresAt || null,
+          isLeftover: !!it.isLeftover,
+          leftoverIdea: it.leftoverIdea || null,
+          owner: user.id,
+        },
+      },
+    });
+    created.push(toItem(data.data));
+  }
+  return created;
+}
 
 export async function scanPantryImage(formData) {
-  try {
-    const user = await checkUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
+  const user = await requireUser();
+  const isPro = user.subscriptionTier === "pro";
+  const imagefile = formData.get("image");
+  if (!imagefile || typeof imagefile.arrayBuffer !== "function") {
+    throw new Error("No image provided");
+  }
 
-    const isPro = user.subscriptionTier == "pro";
+  const bytes = await imagefile.arrayBuffer();
+  const base64Image = Buffer.from(bytes).toString("base64");
+  const mime = imagefile.type || "image/jpeg";
 
-    const imagefile = formData.get("image");
-
-    console.log("IMAGE FROM FORM DATA:", imagefile);
-    console.log("TYPE:", typeof imagefile);
-    console.log("INSTANCE:", imagefile instanceof File);
-
-    if (!imagefile) {
-      throw new Error("No image provided");
-    }
-
-    if (!imagefile) {
-      throw new Error("No image provided");
-    }
-
-    console.log("Image:", imagefile);
-    console.log("arrayBuffer:", typeof imagefile.arrayBuffer);
-
-    const bytes = await imagefile.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64Image = buffer.toString("base64");
-
-    const prompt = `
+  const prompt = `
 You are a professional chef and ingredient recognition expert. Analyze this image of a pantry/fridge and identify all visible food ingredients.
 
 Return ONLY a valid JSON array with this exact structure (no markdown, no explanations):
@@ -54,7 +76,10 @@ Return ONLY a valid JSON array with this exact structure (no markdown, no explan
   {
     "name": "ingredient name",
     "quantity": "estimated quantity with unit",
-    "confidence": 0.95
+    "confidence": 0.95,
+    "shelfLifeDays": 5,
+    "x": 42,
+    "y": 30
   }
 ]
 
@@ -63,272 +88,132 @@ Rules:
 - Be specific (e.g., "Cheddar Cheese" not just "Cheese")
 - Estimate realistic quantities (e.g., "3 eggs", "1 cup milk", "2 tomatoes")
 - Confidence should be 0.7-1.0 (omit items below 0.7)
+- shelfLifeDays: how many more days it will stay good at home, as a whole number
+- x and y: where the ingredient appears in the photo, as a percentage (0-100) from the left and from the top
 - Maximum 20 items
 - Common pantry staples are acceptable (salt, pepper, oil)
 `;
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-nano",
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: `${prompt}`,
-            },
-            {
-              type: "input_image",
-              image_url: `data:image/png;base64,${base64Image}`,
-            },
-          ],
-        },
-      ],
-    });
-
-    const responseFromGpt = response.output_text;
-
-    console.log(responseFromGpt);
-
-    let ingredients;
-    try {
-      const cleanText = responseFromGpt
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-      ingredients = JSON.parse(cleanText);
-    } catch (error) {
-      console.log("Failed to parse Gpt Response", responseFromGpt);
-      throw new Error("Failed to parse ingredients. Please try again");
-    }
-
-    if (!Array.isArray(ingredients) || ingredients.length === 0) {
-      throw new Error(
-        "No ingredients detected in the image . Please try a cleaner photo.",
-      );
-    }
-
-    return {
-      success: true,
-      ingredients: ingredients.slice(0, 20),
-      scansLimit: isPro ? "Unlimited" : 10,
-      message: `Found ${ingredients.length} ingredients! `,
-    };
-  } catch (error) {
-    console.log("Error scanning pantry ", error);
-    throw new Error(error.message || "Failed to scan image ");
-  }
-}
-
-export async function saveToPantry(formData) {
+  let ingredients;
   try {
-    const user = await checkUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const ingredientsJson = formData.get("ingredients");
-    const ingredients = JSON.parse(ingredientsJson);
-
-    if (!ingredients || ingredients.length === 0) {
-      throw new Error("No ingridents to save");
-    }
-
-    const savedItems = [];
-    for (const ingredient of ingredients) {
-      const response = await fetch(`${STRAPI_URL}/api/pantry-items`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${STRAPI_API_TOKEN}`,
-        },
-        body: JSON.stringify({
-          data: {
-            name: ingredient.name,
-            quantity: ingredient.quantity,
-            imageUrl: "",
-            owner: user.id,
-          },
-        }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Strapi Response:", JSON.stringify(data, null, 2)); //// changes
-        savedItems.push(data.data);
-      }
-    }
-
-    return {
-      success: true,
-      savedItems,
-      message: `Saved ${savedItems.length} items to your pantry!`,
-    };
-  } catch (error) {
-    console.error("Error saving to pantry", error);
-    throw new Error("error.message || Failed to save items");
-  }
-}
-
-export async function addPantryItemManually(formData) {
-  try {
-    const user = await checkUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const name = formData.get("name");
-    const quantity = formData.get("quantity");
-
-    if (!name || !quantity) {
-      throw new Error("Name and quantity are required");
-    }
-
-    const response = await fetch(`${STRAPI_URL}/api/pantry-items`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
+    ingredients = await askJson("gpt-4.1-nano", [
+      {
+        role: "user",
+        content: [
+          { type: "input_text", text: prompt },
+          { type: "input_image", image_url: `data:${mime};base64,${base64Image}` },
+        ],
       },
-      body: JSON.stringify({
-        data: {
-          name: name.trim(),
-          quantity: quantity.trim(),
-          imageUrl: "",
-          owner: user.id,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Failed to add item:", errorText);
-      throw new Error("Failed to add item to pantry");
-    }
-
-    const data = await response.json();
-
-    return {
-      success: true,
-      item: data.data,
-      message: "Item added successfully!",
-    };
+    ]);
   } catch (error) {
-    console.error("Error adding item manually:", error);
-    throw new Error(error.message || "Failed to add item");
+    console.error("Failed to scan pantry image:", error);
+    throw new Error("Failed to read ingredients from that photo. Please try again");
   }
+
+  if (!Array.isArray(ingredients) || ingredients.length === 0) {
+    throw new Error("No ingredients detected in the image. Please try a cleaner photo.");
+  }
+
+  const num = (v) => (v === null || v === undefined || v === "" ? NaN : Number(v));
+  return {
+    success: true,
+    ingredients: ingredients
+      .slice(0, 20)
+      .map((i) => ({
+        name: String(i.name || "").trim(),
+        quantity: String(i.quantity || "").trim(),
+        confidence: Math.round(Math.min(1, Math.max(0, Number(i.confidence) || 0.8)) * 100),
+        shelfLifeDays: Number(i.shelfLifeDays) || null,
+        x: Number.isFinite(num(i.x)) ? Math.min(80, Math.max(2, num(i.x))) : null,
+        y: Number.isFinite(num(i.y)) ? Math.min(88, Math.max(4, num(i.y))) : null,
+      }))
+      .filter((i) => i.name),
+    scansLimit: isPro ? "Unlimited" : 10,
+  };
+}
+
+// items: [{ name, quantity, shelfLifeDays? }]
+export async function addPantryItems(items) {
+  const user = await requireUser();
+  const list = (items || []).filter((i) => i?.name?.trim());
+  if (!list.length) throw new Error("No ingredients to save");
+  const unknown = list.filter((i) => !i.shelfLifeDays).map((i) => i.name);
+  const est = await estimateShelfLife(unknown);
+  const created = await createItems(
+    user,
+    list.map((i) => ({
+      ...i,
+      expiresAt: addDays(Number(i.shelfLifeDays) || Number(est[i.name]) || 7),
+    }))
+  );
+  return { success: true, items: created };
+}
+
+export async function saveLeftover({ title, portions, imageUrl, idea }) {
+  const user = await requireUser();
+  const name = `Leftover ${String(title || "dish").split(" ").slice(-1)[0]}`;
+  const [item] = await createItems(user, [
+    {
+      name,
+      quantity: `${portions} ${portions === 1 ? "portion" : "portions"}`,
+      imageUrl: imageUrl || "",
+      expiresAt: addDays(2),
+      isLeftover: true,
+      leftoverIdea: idea || "Box it up for tomorrow's lunch — most dishes reheat well.",
+    },
+  ]);
+  return { success: true, item };
 }
 
 export async function getPantryItems() {
-  try {
-    const user = await checkUser();
-
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const response = await fetch(
-      `${STRAPI_URL}/api/pantry-items?populate=owner&sort=createdAt:desc`,
-      {
-        headers: {
-          Authorization: `Bearer ${STRAPI_API_TOKEN}`,
-        },
-        cache: "no-store",
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch pantry items");
-    }
-
-    const data = await response.json();
-
-    console.log("Current User ID:", user.id);
-    console.log("All Pantry Items:", JSON.stringify(data.data, null, 2));
-    const items = (data.data || []).filter(
-      (item) => item.owner?.id === user.id,
-    );
-
-    const isPro = user.subscriptionTier === "pro";
-
-    return {
-      success: true,
-      items,
-      scansLimit: isPro ? "unlimited" : 10,
-    };
-  } catch (error) {
-    console.error("Error fetching pantry:", error);
-    throw new Error(error.message || "Failed to load pantry");
-  }
+  const user = await requireUser();
+  const data = await strapi(
+    `pantry-items?filters[owner][id][$eq]=${user.id}&sort=createdAt:desc&pagination[pageSize]=200`
+  );
+  return {
+    success: true,
+    items: (data.data || []).map(toItem),
+    scansLimit: user.subscriptionTier === "pro" ? "unlimited" : 10,
+  };
 }
 
-export async function deletePantryItem(formData) {
-  try {
-    const user = await checkUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const itemId = formData.get("itemId");
-
-    const response = await fetch(`${STRAPI_URL}/api/pantry-items/${itemId}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to delete item");
-    }
-
-    return {
-      success: true,
-      message: "Item removed from pantry",
-    };
-  } catch (error) {
-    console.error("Error deleting item:", error);
-    throw new Error(error.message || "Failed to delete item");
-  }
-}
-
-export async function updatePantryItem(formData) {
-  try {
-    const user = await checkUser();
-    if (!user) {
-      throw new Error("User not authenticated");
-    }
-
-    const itemId = formData.get("itemId");
-    const name = formData.get("name");
-    const quantity = formData.get("quantity");
-
-    const response = await fetch(`${STRAPI_URL}/api/pantry-items/${itemId}`, {
+// Give items saved before expiry tracking existed an estimated use-by date.
+export async function fillMissingExpiry() {
+  const user = await requireUser();
+  const data = await strapi(
+    `pantry-items?filters[owner][id][$eq]=${user.id}&filters[expiresAt][$null]=true&pagination[pageSize]=100`
+  );
+  const rows = data.data || [];
+  if (!rows.length) return { success: true, items: [] };
+  const est = await estimateShelfLife(rows.map((r) => r.name));
+  const updated = [];
+  for (const r of rows) {
+    const days = Number(est[r.name]) || 7;
+    const base = r.createdAt ? new Date(r.createdAt) : new Date();
+    const res = await strapi(`pantry-items/${r.documentId}`, {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
-      },
-      body: JSON.stringify({
-        data: {
-          name,
-          quantity,
-        },
-      }),
+      body: { data: { expiresAt: addDays(days, base) } },
     });
-
-    if (!response.ok) {
-      throw new Error("Failed to update item");
-    }
-
-    const data = await response.json();
-
-    return {
-      success: true,
-      item: data.data,
-      message: "Item updated successfully",
-    };
-  } catch (error) {
-    console.error("Error updating item:", error);
-    throw new Error(error.message || "Failed to update item");
+    updated.push(toItem(res.data));
   }
+  return { success: true, items: updated };
+}
+
+export async function deletePantryItem(itemId) {
+  const user = await requireUser();
+  const doc = await ownedDoc("pantry-items", itemId, user.id);
+  if (!doc) throw new Error("Item not found");
+  await strapi(`pantry-items/${itemId}`, { method: "DELETE" });
+  return { success: true };
+}
+
+export async function updatePantryItem(itemId, { name, quantity }) {
+  const user = await requireUser();
+  const doc = await ownedDoc("pantry-items", itemId, user.id);
+  if (!doc) throw new Error("Item not found");
+  const res = await strapi(`pantry-items/${itemId}`, {
+    method: "PUT",
+    body: { data: { name, quantity } },
+  });
+  return { success: true, item: toItem(res.data) };
 }

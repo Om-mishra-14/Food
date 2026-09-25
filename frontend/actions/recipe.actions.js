@@ -70,6 +70,8 @@ export async function getOrGenerateRecipe(formData) {
     }
 
     const recipeName = formData.get("recipeName");
+    // Optional photo to use instead of an Unsplash search (e.g. a TheMealDB thumbnail)
+    const imageOverride = formData.get("imageUrl") || "";
     if (!recipeName) {
       throw new Error("Recipe name is required");
     }
@@ -156,7 +158,8 @@ export async function getOrGenerateRecipe(formData) {
               "step": 1,
               "title": "Brief step title",
               "instruction": "Detailed step instruction",
-              "tip": "Optional cooking tip for this step"
+              "tip": "Optional cooking tip for this step",
+              "timerMinutes": "Minutes to set a timer for if this step involves waiting (number), otherwise 0"
               }
               ],
               "nutrition": {
@@ -175,7 +178,16 @@ export async function getOrGenerateRecipe(formData) {
         "original": "ingredient name",
         "alternatives": ["substitute 1", "substitute 2"]
         }
-        ]
+        ],
+    "dietTags": {
+      "vegetarian": false,
+      "vegan": false,
+      "glutenFree": false,
+      "containsNuts": false,
+      "containsDairy": false,
+      "spiceLevel": "0 (no heat) to 3 (hot)"
+    },
+    "leftoverIdea": "One sentence on how to use up leftovers the next day"
         }
         
         IMPORTANT RULES FOR CATEGORY:
@@ -266,7 +278,7 @@ Guidelines:
 
     // Step 3: Fetch image from Unsplash
     console.log("🖼️ Fetching image from Unsplash...");
-    const imageUrl = await fetchRecipeImage(normalizedTitle);
+    const imageUrl = imageOverride || (await fetchRecipeImage(normalizedTitle));
 
     // Step 4: Save generated recipe to database
     const strapiRecipeData = {
@@ -283,6 +295,8 @@ Guidelines:
         nutrition: recipeData.nutrition,
         tips: recipeData.tips,
         substitution: recipeData.substitutions,
+        dietTags: recipeData.dietTags || null,
+        leftoverIdea: recipeData.leftoverIdea || null,
         imageUrl: imageUrl || "",
         isPublic: true,
         users_permissions_user: user.id,
@@ -610,4 +624,36 @@ export async function getSavedRecipes() {
     console.error("Error fetching saved recipes:", error);
     throw new Error(error.message || "Failed to load saved recipes");
   }
+}
+
+// Save a recipe by title, generating it first if Servd doesn't have it yet
+// (used when saving a TheMealDB dish from the dashboard or Explore).
+export async function saveRecipeByTitle(title, imageUrl) {
+  const formData = new FormData();
+  formData.append("recipeName", title);
+  if (imageUrl) formData.append("imageUrl", imageUrl);
+  const result = await getOrGenerateRecipe(formData);
+  const save = new FormData();
+  save.append("recipeId", result.recipeId);
+  await saveRecipeToCollection(save);
+  return { success: true, title: result.recipe.title };
+}
+
+// Remove a saved recipe by its title.
+export async function unsaveRecipeByTitle(title) {
+  const user = await checkUser();
+  if (!user) throw new Error("User not authenticated");
+  const res = await fetch(
+    `${STRAPI_URL}/api/saved-recipes?filters[user][id][$eq]=${user.id}&filters[recipe][title][$eqi]=${encodeURIComponent(title)}`,
+    { headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` }, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error("Failed to find saved recipe");
+  const data = await res.json();
+  for (const row of data.data || []) {
+    await fetch(`${STRAPI_URL}/api/saved-recipes/${row.documentId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` },
+    });
+  }
+  return { success: true };
 }
