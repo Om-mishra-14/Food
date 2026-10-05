@@ -7,12 +7,34 @@ import KitchenProvider from "@/components/servd/KitchenProvider";
 import AppShell from "@/components/servd/AppShell";
 import PwaInstall from "@/components/servd/PwaInstall";
 import { SPLASH_GATE } from "@/components/servd/Brand";
+import { SITE_URL, SITE_NAME, SITE_TITLE, SITE_DESCRIPTION } from "@/lib/site";
 
 const urbanist = Urbanist({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
 
 export const metadata = {
-  title: "Fridge2Fork - AI Recipes Platform",
-  description: "Snap your fridge, find what to cook, and cook it step by step.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: SITE_TITLE, template: `%s | ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "AI recipe generator",
+    "what to cook with ingredients I have",
+    "fridge to recipe",
+    "pantry recipes",
+    "leftover recipes",
+    "Indian recipes",
+    "meal planner",
+    "zero waste cooking",
+  ],
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
+  robots: { index: true, follow: true },
   applicationName: "Fridge2Fork",
   appleWebApp: { capable: true, title: "Fridge2Fork", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
@@ -24,6 +46,24 @@ export const metadata = {
     ],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
   },
+};
+
+// Tells Google what Fridge2Fork is (shown as rich info in search results).
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "WebSite", name: SITE_NAME, url: SITE_URL },
+    {
+      "@type": "WebApplication",
+      name: SITE_NAME,
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      applicationCategory: "LifestyleApplication",
+      operatingSystem: "Web, Android, iOS",
+      image: `${SITE_URL}/icons/icon-512.png`,
+      author: { "@type": "Person", name: "Om Mishra" },
+    },
+  ],
 };
 
 export const viewport = {
@@ -48,6 +88,7 @@ export default function RootLayout({ children }) {
       <html lang="en" suppressHydrationWarning>
         <head>
           <script dangerouslySetInnerHTML={{ __html: SPLASH_GATE }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }} />
         </head>
         <body className={`sv-body ${urbanist.className}`}>
           <KitchenProvider>
